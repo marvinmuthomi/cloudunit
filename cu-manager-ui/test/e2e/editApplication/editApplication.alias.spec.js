@@ -45,14 +45,15 @@ describe('E2E: EditApplication', function () {
     it('should display the alias card in settings url', function () {
       // set test environment
       dashboard.createApp('testAlias', 1);
-      browser.get('/#/editApplication/testAlias/settings');
+      browser.get('/#/editApplication/testAlias/settingsAlias');
 
-      expect(alias.domain.getAttribute('value')).not.toEqual('');
+      expect(alias.domain.getAttribute('value')).toEqual('');
     });
 
     describe('Add new alias', function () {
       it('should display an error message if alias doesn\'t respect a valid domain name pattern', function () {
-        browser.get('/#/editApplication/testAlias/settings');
+        browser.get('/#/editApplication/testAlias/settingsAlias');
+        browser.driver.sleep(browser.params.sleep.medium);
         var aliasList;
         alias.setAlias('test');
         alias.addAliasBtn.click();
@@ -63,7 +64,7 @@ describe('E2E: EditApplication', function () {
       });
 
       it('should create a new alias', function () {
-        browser.get('/#/editApplication/testAlias/settings');
+        browser.get('/#/editApplication/testAlias/settingsAlias');
         var aliasList;
         alias.setAlias('treeptik.fr');
         alias.addAliasBtn.click().then(function(){
@@ -75,7 +76,7 @@ describe('E2E: EditApplication', function () {
       });
 
       it('should display an error message if alias already exists', function () {
-        browser.get('/#/editApplication/testAlias/settings');
+        browser.get('/#/editApplication/testAlias/settingsAlias');
         alias.setAlias('treeptik.fr');
         alias.addAliasBtn.click().then(function(){
           expect(alias.errorMsg.getText()).toContain('This alias is already used by another application in CloudUnit instance(s)');
@@ -85,7 +86,7 @@ describe('E2E: EditApplication', function () {
 
     describe('remove alias', function () {
       it('should remove alias on click', function () {
-        browser.get('/#/editApplication/testAlias/settings');
+        browser.get('/#/editApplication/testAlias/settingsAlias');
         var aliasList;
         alias.removeAliasBtn.click().then(function(){
           browser.wait(protractor.ExpectedConditions.presenceOf(alias.noAliasMsg), browser.params.sleep.medium);

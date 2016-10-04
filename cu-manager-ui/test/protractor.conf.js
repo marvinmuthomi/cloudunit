@@ -23,7 +23,7 @@ exports.config = {
     '../test/e2e/editApplication/editApplication.spec.js',
     '../test/e2e/editApplication/editApplication.overview.spec.js',
     '../test/e2e/editApplication/editApplication.alias.spec.js',
-    '../test/e2e/editApplication/editApplication.addModule.spec.js',
+    // '../test/e2e/editApplication/editApplication.addModule.spec.js',
     '../test/e2e/editApplication/editApplication.configJVM.spec.js',
     '../test/e2e/editApplication/editApplication.deploy.spec.js'
   ],

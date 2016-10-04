@@ -81,6 +81,8 @@ describe('E2E Test: Edit Application Deploy War', function () {
             }, browser.params.sleep.medium).then(function () {
                  // set test environment
                 dashboard.createApp('testDeploy', 1);
+                //browser.driver.sleep(browser.params.sleep.large);
+
                 browser.get('/#/editApplication/testDeploy/deploy');
 
                 deploy.deployFile('../../uploads/performances.war');
@@ -95,6 +97,7 @@ describe('E2E Test: Edit Application Deploy War', function () {
             });
         });
 
+        // let xit
         xit('should show an error message if file type not authorized', function () {
             var fs = require('fs');
             /*fs.writeFile("./test/uploads/deploy.txt", "Test deploy .txt", function(err) {
@@ -117,8 +120,12 @@ describe('E2E Test: Edit Application Deploy War', function () {
         describe('on file upload', function () {
             it('should show a progress bar', function () {
                 deploy.deployFile('../../uploads/performances.war');
+                browser.driver.sleep(browser.params.sleep.medium);
                 deploy.uploadBtn.click();
                 expect(deploy.progressBar.isDisplayed()).toBeTruthy();
+                browser.driver.sleep(browser.params.sleep.medium);
+                // often so quick
+                //expect(deploy.progressBar.isDisplayed()).toBeTruthy();
                 editApp.overviewTab.click();
             });
 
@@ -135,7 +142,7 @@ describe('E2E Test: Edit Application Deploy War', function () {
                 browser.getAllWindowHandles().then(function (handles) {
                     var newWindowHandle = handles[1];
                     browser.switchTo().window(newWindowHandle).then(function () {
-                        expect(browser.driver.getCurrentUrl()).toBe('http://testdeploy-johndoe-admin.cloudunit.dev/');
+                        expect(browser.driver.getCurrentUrl()).toBe('http://testdeploy-johndoe-admin.cloudunit.dev/performances/');
                     });
                 });
             });

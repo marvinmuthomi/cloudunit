@@ -29,7 +29,7 @@ var ConfigJVMSection = function () {
     this.labelMemory = $('label[for="memory-2048"]');
     this.lastRelease = element.all(by.repeater('jvmReleases in configjvm.jvmReleases')).last();
     //this.lastReleaseRadioElement = element.all(by.repeater('jvmReleases in configjvm.jvmReleases')).last().element(by.css('input[type="radio"]'));
-    this.lastReleaseRadioElement = element(by.repeater('jvmReleases in configjvm.jvmReleases').row(0)).$('input[type="radio"]');
+    this.lastReleaseRadioElement = element.all(by.repeater('jvmReleases in configjvm.jvmReleases')).last().$('input[type="radio"]');
 };
 
 describe('E2E: Edit Application config JVM', function () {
@@ -48,12 +48,14 @@ describe('E2E: Edit Application config JVM', function () {
     it('should display the config JVM card in settings url', function () {
         // set test environment
         dashboard.createApp('testJVM', 1);
-        browser.get('/#/editApplication/testJVM/settings');
+        browser.get('/#/editApplication/testJVM/settingsJVM');
         expect(element(by.id('config-JVM'))).toBeTruthy();
     });
 
     it('should have a default value : 512 Mo', function () {
-        browser.get('/#/editApplication/testJVM/settings');
+        browser.get('/#/dashboard');
+        browser.driver.sleep(browser.params.sleep.small);
+        browser.get('/#/editApplication/testJVM/settingsJVM');
         expect(element(by.css('input[name="selectedJvmMemory"]:checked')).getAttribute('value')).toBe('512');
     });
 

@@ -142,7 +142,7 @@ describe('E2E: EditApplication', function () {
       });
 
       describe('Settings Tab', function () {
-        it('should display settings section', function () {
+        xit('should display settings section', function () {
           editApp.settingsTab.click().then(function(){
             expect(editApp.settingsTab.isPresent()).toBeTruthy();
             expect(browser.getLocationAbsUrl()).toMatch('/editApplication/testApp/settings');
