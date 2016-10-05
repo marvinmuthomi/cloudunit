@@ -92,7 +92,7 @@ var DashboardPage = (function () {
     this.serverChoice = function (serverChoice) {
       var self = this;
       self.dropdownToggle.sendKeys(protractor.Key.ENTER);
-      for(var i = 0; i < serverChoice; i++) {
+      for(var i = 1; i < serverChoice; i++) {
         self.dropdownToggle.sendKeys(protractor.Key.ARROW_DOWN);  
       }
       return self.dropdownToggle.getAttribute('value');

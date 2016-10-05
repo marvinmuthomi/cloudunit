@@ -25,6 +25,7 @@ describe('E2E: EditApplication', function () {
   beforeEach(function () {
     editApp = components.EditApplicationPage;
     dashboard = components.DashboardPage;
+    browser.ignoreSynchronization = true;
   });
 
   describe('create an application', function () {
@@ -61,6 +62,8 @@ describe('E2E: EditApplication', function () {
 
     it('should have application name in page title', function () {
       browser.get('/#/editApplication/testApp/overview');
+      // todo make an expected condition
+      browser.driver.sleep(browser.params.sleep.medium);
       expect(editApp.pageTitle.getText()).toMatch('Application testApp');
     });
 

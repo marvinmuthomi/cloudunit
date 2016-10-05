@@ -21,7 +21,7 @@ var components = new importer();
 
 var OverviewSection = function () {
   'use strict';
-  this.serverBtn = element(by.css('.server-btn'));
+  this.serverBtn = element.all(by.css('.server-btn')).first();
   this.serverStatus = element(by.binding('overview.app.status'));
   this.creationDate = element(by.id('creation-date'));
   this.serverName = element(by.id('server'));
@@ -51,7 +51,7 @@ login(browser.params.loginAdmin);
       dashboard.createApp('testOverview', 1);
       
       browser.get('/#/editApplication/testOverview/overview');
-      browser.driver.sleep(browser.params.sleep.small);
+      browser.driver.sleep(browser.params.sleep.large);
       expect(overview.creationDate.getAttribute('value')).not.toEqual('');
       expect(overview.serverName.getAttribute('value')).not.toEqual('');
       expect(overview.jvmMemory.getAttribute('value')).not.toEqual('');
