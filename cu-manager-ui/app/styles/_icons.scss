@@ -104,13 +104,13 @@
 .icon-tech.tomcat:before {
   content: "\e910";
 }
-.icon-tech.wildfly {
-  transform: scale(2.2);
-  -webkit-transform: scale(2.2);
-
-  &:before {
-    content: "\e914";
-  }
+.icon-tech.wildfly:before {
+  // transform: scale(2.2);
+  // -webkit-transform: scale(2.2);
+  content: "\e914";
+  // &:before {
+  //   content: "\e914";
+  // }
 }
 .icon-tech.fatjar:before {
   content: "\e91c";
@@ -2219,4 +2219,13 @@
   position: relative;
   top: 1px;
   margin-right: 4px;
+}
+
+.features-icon-tech:before {
+  position: absolute;
+  right: 100px;
+  top: 100px;
+  -webkit-transform: scale(9.2);
+  // color: #c7f1ff;
+  color: rgba(0, 0, 0, 0.15);
 }
