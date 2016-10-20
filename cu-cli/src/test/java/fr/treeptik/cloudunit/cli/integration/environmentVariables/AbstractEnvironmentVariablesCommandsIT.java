@@ -11,7 +11,7 @@ import org.springframework.shell.core.CommandResult;
 
 import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
 
-public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegrationTest {
+public abstract class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegrationTest {
     
     protected AbstractEnvironmentVariablesCommandsIT(String serverType) {
         super(serverType);
