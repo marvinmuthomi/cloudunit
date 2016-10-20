@@ -7,12 +7,12 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
 /**
  * Created by guillaume on 16/10/15.
  */
-public abstract class AbstractDeploymentCommandsIT extends AbstractShellIntegrationTest {
+public abstract class AbstractDeploymentCommandsIT extends AbstractShellIT {
     private static final String WAR_FILENAME = "src/test/resources/helloworld.war";
 
     protected AbstractDeploymentCommandsIT(String serverType) {

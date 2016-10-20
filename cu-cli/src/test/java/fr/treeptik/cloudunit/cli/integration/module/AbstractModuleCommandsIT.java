@@ -9,12 +9,12 @@ import org.junit.Assume;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
 /**
  * Created by guillaume on 16/10/15.
  */
-public abstract class AbstractModuleCommandsIT extends AbstractShellIntegrationTest {
+public abstract class AbstractModuleCommandsIT extends AbstractShellIT {
     protected AbstractModuleCommandsIT(String serverType) {
         super(serverType);
     }

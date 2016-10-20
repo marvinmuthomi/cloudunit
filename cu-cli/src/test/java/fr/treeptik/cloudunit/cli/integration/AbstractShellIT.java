@@ -11,7 +11,7 @@ import org.springframework.shell.core.JLineShellComponent;
 /**
  * Created by guillaume on 15/10/15.
  */
-public class AbstractShellIntegrationTest {
+public abstract class AbstractShellIT {
     public static final String TEST_USER = "johndoe";
     public static final String TEST_PASSWORD = "abc2015";
 
@@ -20,7 +20,7 @@ public class AbstractShellIntegrationTest {
 
     protected final String serverType;
     
-    protected AbstractShellIntegrationTest(String serverType) {
+    protected AbstractShellIT(String serverType) {
         this.serverType = serverType;
     }
 

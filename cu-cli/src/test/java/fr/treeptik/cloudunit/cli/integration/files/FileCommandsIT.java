@@ -9,12 +9,12 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
 /**
  * Created by Nicolas
  */
-public class FileCommandsIT extends AbstractShellIntegrationTest {
+public class FileCommandsIT extends AbstractShellIT {
 
     public FileCommandsIT() {
         super("tomcat-8");

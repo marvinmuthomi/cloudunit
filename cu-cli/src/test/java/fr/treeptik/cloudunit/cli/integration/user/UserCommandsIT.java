@@ -7,12 +7,12 @@ import static org.junit.Assert.*;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
 /**
  * Created by guillaume on 15/10/15.
  */
-public class UserCommandsIT extends AbstractShellIntegrationTest {
+public class UserCommandsIT extends AbstractShellIT {
     public UserCommandsIT() {
         super("tomcat-8");
     }

@@ -9,9 +9,9 @@ import org.junit.Assert;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
-public abstract class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegrationTest {
+public abstract class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIT {
     
     protected AbstractEnvironmentVariablesCommandsIT(String serverType) {
         super(serverType);

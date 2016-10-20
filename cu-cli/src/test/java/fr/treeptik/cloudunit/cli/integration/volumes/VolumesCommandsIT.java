@@ -11,9 +11,9 @@ import org.junit.Before;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
-public class VolumesCommandsIT extends AbstractShellIntegrationTest {
+public class VolumesCommandsIT extends AbstractShellIT {
     private String volumeName;
 
     public VolumesCommandsIT() {

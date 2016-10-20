@@ -29,7 +29,6 @@ import org.springframework.stereotype.Component;
 import fr.treeptik.cloudunit.cli.CloudUnitCliException;
 import fr.treeptik.cloudunit.cli.Guard;
 import fr.treeptik.cloudunit.cli.Messages;
-import fr.treeptik.cloudunit.cli.commands.ShellStatusCommand;
 import fr.treeptik.cloudunit.cli.exception.ManagerResponseException;
 import fr.treeptik.cloudunit.cli.processor.InjectLogger;
 import fr.treeptik.cloudunit.cli.rest.RestUtils;
@@ -59,16 +58,12 @@ public class ModuleUtils {
     private Logger log;
 
     @Autowired
-    private ShellStatusCommand statusCommand;
-
-    @Autowired
     private RestUtils restUtils;
 
     public String getListModules() {
         applicationUtils.checkConnectedAndApplicationSelected();
         
         String dockerManagerIP = applicationUtils.getCurrentApplication().getManagerIp();
-        statusCommand.setExitStatut(0);
         MessageConverter.buildLightModuleMessage(applicationUtils.getCurrentApplication(), dockerManagerIP);
 
         int size = applicationUtils.getCurrentApplication().getModules().size();

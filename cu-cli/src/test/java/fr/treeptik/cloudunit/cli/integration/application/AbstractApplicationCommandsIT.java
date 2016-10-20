@@ -10,12 +10,12 @@ import fr.treeptik.cloudunit.cli.CloudUnitCliException;
 import org.junit.Test;
 import org.springframework.shell.core.CommandResult;
 
-import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
+import fr.treeptik.cloudunit.cli.integration.AbstractShellIT;
 
 /**
  * Created by guillaume on 16/10/15.
  */
-public abstract class AbstractApplicationCommandsIT extends AbstractShellIntegrationTest {
+public abstract class AbstractApplicationCommandsIT extends AbstractShellIT {
 
     protected AbstractApplicationCommandsIT(String serverType) {
         super(serverType);
