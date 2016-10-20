@@ -81,8 +81,8 @@ public class AbstractShellIntegrationTest {
         return getShell().executeCommand(String.format("add-module --name %s", moduleName));
     }
 
-    protected CommandResult displayModules() {
-        return getShell().executeCommand("display-modules");
+    protected CommandResult listModules() {
+        return getShell().executeCommand("list-modules");
     }
 
     protected CommandResult disconnect() {

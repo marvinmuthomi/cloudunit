@@ -83,7 +83,7 @@ public abstract class AbstractModuleCommandsIT extends AbstractShellIntegrationT
             CommandResult result = addModule("mysql-5-5");
             Assume.assumeThat(result, isSuccessfulCommand());
             
-            result = displayModules();
+            result = listModules();
             
             assertThat(result, isSuccessfulCommand());
             assertThat(result.getResult().toString(), containsString("1"));
@@ -98,7 +98,7 @@ public abstract class AbstractModuleCommandsIT extends AbstractShellIntegrationT
     public void test_shouldNotListModulesBecauseApplicationNotSelected() {
         connect();
         try {
-            CommandResult result = displayModules();
+            CommandResult result = listModules();
             
             assertThat(result, isFailedCommand());
             assertThat(result.getException().getMessage(), containsString("not selected"));
@@ -109,7 +109,7 @@ public abstract class AbstractModuleCommandsIT extends AbstractShellIntegrationT
 
     @Test
     public void test_shouldNotListModulesBecauseUserIsNotLogged() {
-        CommandResult result = displayModules();
+        CommandResult result = listModules();
         
         assertThat(result, isFailedCommand());
         assertThat(result.getException().getMessage(), containsString("not connected"));
