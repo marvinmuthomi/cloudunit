@@ -15,12 +15,12 @@
 
 package fr.treeptik.cloudunit.controller;
 
-import java.io.Serializable;
 import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
+import javax.validation.Valid;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -40,8 +40,8 @@ import fr.treeptik.cloudunit.aspects.CloudUnitSecurable;
 import fr.treeptik.cloudunit.config.events.ApplicationStartEvent;
 import fr.treeptik.cloudunit.config.events.ServerStartEvent;
 import fr.treeptik.cloudunit.dto.HttpOk;
-import fr.treeptik.cloudunit.dto.JsonInput;
 import fr.treeptik.cloudunit.dto.JsonResponse;
+import fr.treeptik.cloudunit.dto.JvmConfigurationResource;
 import fr.treeptik.cloudunit.dto.VolumeAssociationDTO;
 import fr.treeptik.cloudunit.dto.VolumeResource;
 import fr.treeptik.cloudunit.exception.CheckException;
@@ -54,15 +54,11 @@ import fr.treeptik.cloudunit.service.ApplicationService;
 import fr.treeptik.cloudunit.service.ServerService;
 import fr.treeptik.cloudunit.service.VolumeService;
 import fr.treeptik.cloudunit.utils.AuthentificationUtils;
-import fr.treeptik.cloudunit.utils.CheckUtils;
 
 @Controller
-@RequestMapping("/server")
-public class ServerController implements Serializable {
-
-	private static final long serialVersionUID = 1L;
-
-	private final Locale locale = Locale.ENGLISH;
+@RequestMapping("/applications/{applicationId}/server")
+public class ServerController {
+	private static final Locale LOCALE = Locale.ENGLISH;
 
 	private Logger logger = LoggerFactory.getLogger(ServerController.class);
 
@@ -90,25 +86,23 @@ public class ServerController implements Serializable {
 	 * @throws CheckException
 	 */
 	@CloudUnitSecurable
-	@RequestMapping(value = "/configuration/jvm", method = RequestMethod.PUT)
-	@ResponseBody
-	public JsonResponse setOptionsJVM(@RequestBody JsonInput input) throws ServiceException, CheckException {
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("" + input);
-		}
+	@RequestMapping(value = "/jvm-configuration", method = RequestMethod.PUT)
+	public ResponseEntity<?> setJvmConfiguration(
+	        @PathVariable Integer applicationId,
+	        @Valid @RequestBody JvmConfigurationResource request)
+	        throws ServiceException, CheckException {
+		logger.debug("Requested JVM configuration: {}", request);
 
 		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, input.getApplicationName());
+		Application application = applicationService.findById(applicationId);
 
-		authentificationUtils.canStartNewAction(user, application, locale);
-		CheckUtils.checkJavaOpts(input.getJvmOptions(), input.getJvmMemory(), input.getJvmRelease());
+		authentificationUtils.canStartNewAction(user, application, LOCALE);
 
 		applicationService.setStatus(application, Status.PENDING);
 
 		try {
 			Server server = application.getServer();
-			serverService.update(server, input.getJvmMemory(), input.getJvmOptions(), input.getJvmRelease(), false);
+			serverService.update(server, request.getMemory().getSize(), request.getOptions(), request.getRelease().getVersion(), false);
 
 		} catch (Exception e) {
 			applicationService.setStatus(application, Status.FAIL);
@@ -116,7 +110,7 @@ public class ServerController implements Serializable {
 
 		applicationService.setStatus(application, Status.START);
 
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
 	}
 
 	@RequestMapping(value = "/volume/containerName/{containerName}", method = RequestMethod.GET)

@@ -134,6 +134,11 @@
 			<artifactId>spring-context</artifactId>
 			<version>${spring.version}</version>
 		</dependency>
+		
+		<dependency>
+           <groupId>org.springframework.hateoas</groupId>
+           <artifactId>spring-hateoas</artifactId>
+        </dependency>
 
 		<dependency>
 			<groupId>org.springframework</groupId>
@@ -217,15 +222,29 @@
 			<version>2.2.0</version>
 		</dependency>
 
-
-
-
 		<!-- Hibernate Validator -->
+		<dependency>
+		    <groupId>javax.validation</groupId>
+		    <artifactId>validation-api</artifactId>
+		    <version>1.1.0.Final</version>
+		</dependency>
+		
 		<dependency>
 			<groupId>org.hibernate</groupId>
 			<artifactId>hibernate-validator</artifactId>
-			<version>4.3.0.Final</version>
-			<scope>test</scope>
+			<version>${hibernate.version}</version>
+		</dependency>
+		
+		<dependency>
+		    <groupId>javax.el</groupId>
+		    <artifactId>javax.el-api</artifactId>
+		    <version>2.2.4</version>
+		</dependency>
+		
+		<dependency>
+		    <groupId>org.glassfish.web</groupId>
+		    <artifactId>javax.el</artifactId>
+		    <version>2.2.4</version>
 		</dependency>
 
 		<!-- IO utils -->
@@ -425,7 +444,22 @@
 			<version>2.10.1</version>
 			<scope>test</scope>
 		</dependency>
-
+		
+		
+        <dependency>
+           <groupId>javax.json</groupId>
+           <artifactId>javax.json-api</artifactId>
+           <version>1.0</version>
+           <scope>test</scope>
+        </dependency>
+        
+        <dependency>
+           <groupId>org.glassfish</groupId>
+           <artifactId>javax.json</artifactId>
+           <version>1.0.4</version>
+           <scope>test</scope>
+        </dependency>
+		
 	</dependencies>
 
 	<!-- PROFILES -->

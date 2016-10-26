@@ -24,8 +24,8 @@ import fr.treeptik.cloudunit.exception.ServiceException;
 import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
 import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.SpyMatcherDecorator;
 import fr.treeptik.cloudunit.utils.CheckBrokerConnectionUtils;
-import fr.treeptik.cloudunit.utils.SpyMatcherDecorator;
 import fr.treeptik.cloudunit.utils.TestUtils;
 import junit.framework.TestCase;
 import org.apache.commons.io.FilenameUtils;
@@ -392,7 +392,7 @@ public abstract class AbstractModuleControllerTestIT extends TestCase {
     public void test_runScript() throws Exception {
         requestAddModule();
         String filename = FilenameUtils.getName(testScriptPath);
-        if(filename == null){
+        if(filename == null) {
             logger.info("No script found - test escape");
         } else {
             MockMultipartFile file = new MockMultipartFile(

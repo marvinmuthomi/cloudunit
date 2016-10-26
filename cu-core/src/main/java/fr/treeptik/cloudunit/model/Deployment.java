@@ -13,56 +13,53 @@ package fr.treeptik.cloudunit.model;/*
 									* For any questions, contact us : contact@treeptik.fr
 									*/
 
-import java.io.Serializable;
 import java.util.Date;
 
-import javax.persistence.*;
-
-import com.fasterxml.jackson.annotation.JsonFormat;
-import com.fasterxml.jackson.annotation.JsonIgnore;
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.Id;
+import javax.persistence.ManyToOne;
+import javax.persistence.Temporal;
+import javax.persistence.TemporalType;
 
 @Entity
-public class Deployment implements Serializable {
-
-	private static final long serialVersionUID = 1L;
-
+public class Deployment {
 	@Id
 	@GeneratedValue
 	private Integer id;
-
-	@Temporal(TemporalType.TIMESTAMP)
-	@JsonFormat(pattern = "YYYY-MM-dd HH:mm")
-	private Date date;
-
-	@JsonIgnore
+	
 	@ManyToOne
 	private Application application;
 
+	@Temporal(TemporalType.TIMESTAMP)
+	private Date date;
+	
+	private String contextPath;
+	
 	@Enumerated(EnumType.STRING)
 	private DeploymentType type;
+	
+	protected Deployment() {}
+	
+	public Deployment(Application application, String contextPath, DeploymentType type) {
+	    this.application = application;
+	    this.contextPath = contextPath;
+	    this.type = type;
+	    this.date = new Date();
+	}
 
 	public Integer getId() {
 		return id;
 	}
-
-	public void setId(Integer id) {
-		this.id = id;
-	}
+	
+	public Application getApplication() {
+        return application;
+    }
 
 	public Date getDate() {
 		return date;
-	}
-
-	public void setDate(Date date) {
-		this.date = date;
-	}
-
-	public Application getApplication() {
-		return application;
-	}
-
-	public void setApplication(Application application) {
-		this.application = application;
 	}
 
 	public DeploymentType getType() {
@@ -72,5 +69,12 @@ public class Deployment implements Serializable {
 	public void setType(DeploymentType type) {
 		this.type = type;
 	}
-
+	
+	public String getContextPath() {
+        return contextPath;
+    }
+    
+    public String getUri() {
+        return application.getLocation() + "/" + (contextPath.equals("ROOT") ? "" : contextPath);
+    }
 }

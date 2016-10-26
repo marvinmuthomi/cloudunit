@@ -1,18 +1,17 @@
 package fr.treeptik.cloudunit.enums;
 
-import org.junit.Assert;
-
 import java.util.HashMap;
 import java.util.Map;
 
-import static org.junit.Assert.*;
+import org.junit.Assert;
+import org.junit.Test;
 
 /**
  * Created by nicolas on 09/08/2016.
  */
 public class RemoteExecActionTest {
 
-    @org.junit.Test
+    @Test
     public void getCommandWithParam() throws Exception {
         Map<String, String> kv = new HashMap<>();
         kv.put("CU_USER", "johndoe");

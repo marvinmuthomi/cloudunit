@@ -30,10 +30,8 @@
 
 package fr.treeptik.cloudunit.config;
 
-import com.fasterxml.jackson.databind.JsonMappingException;
-import fr.treeptik.cloudunit.dto.HttpErrorServer;
-import fr.treeptik.cloudunit.exception.CheckException;
-import fr.treeptik.cloudunit.exception.ServiceException;
+import java.util.NoSuchElementException;
+
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -44,28 +42,17 @@ import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.context.request.WebRequest;
 import org.springframework.web.servlet.mvc.method.annotation.ResponseEntityExceptionHandler;
 
-import java.util.NoSuchElementException;
+import com.fasterxml.jackson.databind.JsonMappingException;
+
+import fr.treeptik.cloudunit.dto.HttpErrorServer;
+import fr.treeptik.cloudunit.exception.CheckException;
+import fr.treeptik.cloudunit.exception.ServiceException;
 
 @ControllerAdvice
-public class RestHandlerException
-    extends ResponseEntityExceptionHandler {
-
-    @ExceptionHandler(value = {ServiceException.class, JsonMappingException.class})
-    protected ResponseEntity<Object> handleServiceException(Exception ex,
-                                                            WebRequest request) {
-        ex.printStackTrace();
-        HttpHeaders headers = new HttpHeaders();
-        headers.setContentType(MediaType.APPLICATION_JSON);
-        return handleExceptionInternal(ex,
-            new HttpErrorServer(ex.getLocalizedMessage()), headers,
-            HttpStatus.INTERNAL_SERVER_ERROR, request);
-    }
-
+public class RestHandlerException extends ResponseEntityExceptionHandler {
     @Override
-    protected ResponseEntity<Object> handleHttpMessageNotReadable(HttpMessageNotReadableException ex,
-                                                                  HttpHeaders headers,
-                                                                  HttpStatus status,
-                                                                  WebRequest request) {
+    protected ResponseEntity<Object> handleHttpMessageNotReadable(
+            HttpMessageNotReadableException ex, HttpHeaders headers, HttpStatus status, WebRequest request) {
         ex.printStackTrace();
         headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -74,10 +61,20 @@ public class RestHandlerException
                 HttpStatus.BAD_REQUEST, request);
     }
 
+    @ExceptionHandler(value = {ServiceException.class, JsonMappingException.class})
+    protected ResponseEntity<Object> handleServiceException(Exception ex, WebRequest request) {
+        ex.printStackTrace();
+        HttpHeaders headers = new HttpHeaders();
+        headers.setContentType(MediaType.APPLICATION_JSON);
+        return handleExceptionInternal(ex,
+            new HttpErrorServer(ex.getLocalizedMessage()),
+            headers,
+            HttpStatus.INTERNAL_SERVER_ERROR,
+            request);
+    }
 
     @ExceptionHandler(value = {CheckException.class})
-    protected ResponseEntity<Object> handleCheckedeException(Exception ex,
-                                                             WebRequest request) {
+    protected ResponseEntity<Object> handleCheckedeException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
@@ -85,109 +82,92 @@ public class RestHandlerException
             new HttpErrorServer(ex.getLocalizedMessage()), headers,
             HttpStatus.BAD_REQUEST, request);
     }
-
+    
     @ExceptionHandler(value = {NullPointerException.class})
-    protected ResponseEntity<Object> handleNullPointerException(Exception ex,
-                                                                WebRequest request) {
+    protected ResponseEntity<Object> handleNullPointerException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response : NullPointerException"),
+            new HttpErrorServer("An unkown error has occured! Server response : NullPointerException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {OutOfMemoryError.class})
-    protected ResponseEntity<Object> handleOutOfMemoryError(Exception ex,
-                                                            WebRequest request) {
+    protected ResponseEntity<Object> handleOutOfMemoryError(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response : OutOfMemoryError"),
+            new HttpErrorServer("An unkown error has occured! Server response : OutOfMemoryError"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {ClassCastException.class})
-    protected ResponseEntity<Object> handleClassCastException(Exception ex,
-                                                              WebRequest request) {
+    protected ResponseEntity<Object> handleClassCastException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response : ClassCastException"),
+            new HttpErrorServer("An unkown error has occured! Server response : ClassCastException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {IllegalStateException.class})
-    protected ResponseEntity<Object> handleIllegalStateException(Exception ex,
-                                                                 WebRequest request) {
+    protected ResponseEntity<Object> handleIllegalStateException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response : IllegalStateException"),
+            new HttpErrorServer("An unkown error has occured! Server response : IllegalStateException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {IllegalArgumentException.class})
-    protected ResponseEntity<Object> handleIllegalArgumentException(
-        Exception ex, WebRequest request) {
+    protected ResponseEntity<Object> handleIllegalArgumentException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                    ex.getMessage()),
+            new HttpErrorServer(ex.getMessage()),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {NoSuchElementException.class})
-    protected ResponseEntity<Object> handleNoSuchElementException(Exception ex,
-                                                                  WebRequest request) {
+    protected ResponseEntity<Object> handleNoSuchElementException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response :  NoSuchElementException"),
+            new HttpErrorServer("An unkown error has occured! Server response :  NoSuchElementException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {ArithmeticException.class})
-    protected ResponseEntity<Object> handleArithmeticException(Exception ex,
-                                                               WebRequest request) {
+    protected ResponseEntity<Object> handleArithmeticException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response :   ArithmeticException"),
+            new HttpErrorServer("An unkown error has occured! Server response :   ArithmeticException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
 
     @ExceptionHandler(value = {IndexOutOfBoundsException.class})
-    protected ResponseEntity<Object> handleIndexOutOfBoundsException(
-        Exception ex, WebRequest request) {
+    protected ResponseEntity<Object> handleIndexOutOfBoundsException(Exception ex, WebRequest request) {
         ex.printStackTrace();
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_JSON);
         return handleExceptionInternal(
             ex,
-            new HttpErrorServer(
-                "An unkown error has occured! Server response :   IndexOutOfBoundsException"),
+            new HttpErrorServer("An unkown error has occured! Server response :   IndexOutOfBoundsException"),
             headers, HttpStatus.INTERNAL_SERVER_ERROR, request);
     }
-
 }

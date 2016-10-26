@@ -24,11 +24,13 @@ import fr.treeptik.cloudunit.dto.ContainerUnit;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.ServiceException;
 import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.Deployment;
 import fr.treeptik.cloudunit.model.Status;
 import fr.treeptik.cloudunit.model.User;
 
 public interface ApplicationService {
-
+    Application findById(Integer applicationId) throws ServiceException, CheckException;
+    
 	Application findByNameAndUser(User user, String applicationName) throws ServiceException, CheckException;
 
 	List<Application> findAll() throws ServiceException;
@@ -47,7 +49,9 @@ public interface ApplicationService {
 
 	void setStatus(Application application, Status status) throws ServiceException;
 
-	Application deploy(MultipartFile file, Application application) throws ServiceException, CheckException;
+	Deployment deploy(MultipartFile file, Application application) throws ServiceException, CheckException;
+
+    Deployment deploy(Application application, String contextPath, MultipartFile file) throws ServiceException, CheckException;
 
 	Application start(Application application) throws ServiceException;
 
@@ -65,7 +69,8 @@ public interface ApplicationService {
 
 	Application remove(Application application, User user) throws ServiceException, CheckException;
 
-	Application create(String applicationName, String login, String serverName, String tagName, String origin)
+	Application create(String name, String displayName, String login, String serverName,
+            String tagName, String origin)
 			throws ServiceException, CheckException;
 
 	void removePort(Application application, Integer port) throws CheckException, ServiceException;

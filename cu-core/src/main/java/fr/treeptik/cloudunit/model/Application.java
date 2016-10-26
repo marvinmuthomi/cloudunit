@@ -42,7 +42,7 @@ import javax.persistence.UniqueConstraint;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
 import com.fasterxml.jackson.annotation.JsonIgnore;
-import fr.treeptik.cloudunit.utils.AlphaNumericsCharactersCheckUtils;
+
 
 @Entity
 @Table(uniqueConstraints = @UniqueConstraint(columnNames = { "user_id", "name", "cuInstanceName" }))
@@ -116,16 +116,6 @@ public class Application implements Serializable {
 
 	private String deploymentStatus;
 
-	public String getContextPath() {
-		return contextPath;
-	}
-
-	public void setContextPath(String contextPath) {
-		this.contextPath = contextPath;
-	}
-
-	private String contextPath;
-
 	private boolean isAClone;
 
 	@OneToMany(cascade = CascadeType.REMOVE, mappedBy = "application")
@@ -139,18 +129,19 @@ public class Application implements Serializable {
 
 	public Application() {
 		super();
-		date = new Date();
-		isAClone = false;
-		deploymentStatus = Application.NONE;
+		this.date = new Date();
+		this.isAClone = false;
+		this.deploymentStatus = Application.NONE;
+		this.modules = new HashSet<>();
+		this.portsToOpen = new HashSet<>();
+		this.environmentVariables = new HashSet<>();
 	}
 
-	public Application(Integer id, String name, String cuInstanceName, User user, List<Module> modules) {
-		super();
-		this.id = id;
+	public Application(String name, String cuInstanceName, User user) {
+		this();
 		this.name = name;
 		this.cuInstanceName = cuInstanceName;
 		this.user = user;
-		this.modules = new HashSet<>(modules);
 	}
 
 	public Integer getId() {
@@ -166,8 +157,7 @@ public class Application implements Serializable {
 	}
 
 	public void setName(String name) {
-		name = name.toLowerCase();
-		this.name = AlphaNumericsCharactersCheckUtils.convertToAlphaNumerics(name);
+		this.name = name;
 	}
 
 	public String getDisplayName() {
@@ -368,10 +358,6 @@ public class Application implements Serializable {
 		return deploymentStatus;
 	}
 
-	public void setDeploymentStatus(String deploymentStatus) {
-		this.deploymentStatus = deploymentStatus;
-	}
-
 	public Set<PortToOpen> getPortsToOpen() {
 
 		if (portsToOpen == null) {
@@ -381,6 +367,13 @@ public class Application implements Serializable {
 		return this.portsToOpen;
 	}
 
+    public Deployment addDeployment(String contextPath, DeploymentType type) {
+        Deployment deployment = new Deployment(this, contextPath, type);
 
-
+        deployments.add(deployment);
+        
+        deploymentStatus = Application.ALREADY_DEPLOYED;
+        
+        return deployment;
+    }
 }

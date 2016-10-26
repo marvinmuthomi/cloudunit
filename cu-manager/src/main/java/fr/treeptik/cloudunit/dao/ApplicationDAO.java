@@ -33,6 +33,15 @@ public interface ApplicationDAO extends JpaRepository<Application, Integer> {
 			+ "where a.user.id=:userId and a.name=:name and a.cuInstanceName=:cuInstanceName")
 	Application findByNameAndUser(@Param("userId") Integer userId, @Param("name") String name,
 			@Param("cuInstanceName") String cuInstanceName) throws DataAccessException;
+	
+	@Query("Select distinct a from Application a "
+	        + "left join fetch a.server s "
+            + "left join fetch a.modules m left join fetch a.deployments "
+	        + "left join fetch a.aliases "
+            + "left join fetch a.portsToOpen "
+            + "left join fetch m.ports "
+            + "where a.id = :applicationId")
+	Application findById(@Param("applicationId") Integer applicationId);
 
 	@Query("Select distinct a from Application a " + "join fetch a.server " + "left join fetch a.modules "
 			+ "left join fetch a.deployments " + "left join fetch a.aliases " + "left join fetch a.portsToOpen "

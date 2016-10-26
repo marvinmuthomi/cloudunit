@@ -15,8 +15,16 @@
 
 package fr.treeptik.cloudunit.utils;
 
-import fr.treeptik.cloudunit.model.*;
 import org.springframework.context.MessageSource;
+
+import fr.treeptik.cloudunit.dto.*;
+import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.Deployment;
+import fr.treeptik.cloudunit.model.Message;
+import fr.treeptik.cloudunit.model.Module;
+import fr.treeptik.cloudunit.model.Server;
+import fr.treeptik.cloudunit.model.Snapshot;
+import fr.treeptik.cloudunit.model.User;
 
 import java.util.Locale;
 

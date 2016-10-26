@@ -15,9 +15,10 @@
 
 package fr.treeptik.cloudunit.utils;
 
-import java.util.Arrays;
-import java.util.List;
+import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import org.springframework.context.MessageSource;
 
@@ -29,10 +30,9 @@ import fr.treeptik.cloudunit.model.Application;
  * Created by nicolas on 18/08/2014.
  */
 public class CheckUtils {
-
-	private static final List<String> listJvmMemoriesAllowed = Arrays.asList(JvmMemory.SIZE_512.getSize(),
-			JvmMemory.SIZE_1024.getSize(), JvmMemory.SIZE_2048.getSize(), JvmMemory.SIZE_3072.getSize(),
-			JvmMemory.SIZE_4096.getSize());
+	private static final Set<String> ALLOWED_JVM_MEMORIES = EnumSet.allOf(JvmMemory.class).stream()
+	        .map(m -> m.getSize())
+	        .collect(Collectors.toSet());
 
 	private static MessageSource messageSource = (MessageSource) StaticSpringApplicationContext.getBean("messageSource");
 
@@ -167,7 +167,7 @@ public class CheckUtils {
 				throw new CheckException("You are not allowed to change memory with java opts");
 			}
 		}
-		if (!listJvmMemoriesAllowed.contains(jvmMemory)) {
+		if (!ALLOWED_JVM_MEMORIES.contains(jvmMemory)) {
 			throw new CheckException("You are not allowed to set this jvm memory size : [" + jvmMemory + "]");
 		}
 

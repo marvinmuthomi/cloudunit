@@ -256,7 +256,7 @@ public class SnapshotServiceImpl implements SnapshotService {
 			}
 
 			// creation de la nouvelle app à partir de l'image tagée
-			Application application = applicationService.create(applicationName, user.getLogin(), snapshot.getType(),
+			Application application = applicationService.create(applicationName, applicationName, user.getLogin(), snapshot.getType(),
 					snapshot.getFullTag(), snapshot.getTag());
 
 			// We need it to get lazy modules relationships
@@ -268,7 +268,7 @@ public class SnapshotServiceImpl implements SnapshotService {
 
 			restoreModules(snapshot, application, tag);
 
-			application.setDeploymentStatus(snapshot.getDeploymentStatus());
+			//application.setDeploymentStatus(snapshot.getDeploymentStatus());
 			applicationService.saveInDB(application);
 			
 			for (String savedPort : snapshot.getSavedPorts()) {

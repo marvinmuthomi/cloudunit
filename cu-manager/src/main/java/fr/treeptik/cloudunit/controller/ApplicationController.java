@@ -15,20 +15,21 @@
 
 package fr.treeptik.cloudunit.controller;
 
-import java.io.IOException;
-import java.io.Serializable;
+import static org.springframework.hateoas.mvc.ControllerLinkBuilder.*;
+
+import java.net.URI;
+import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.stream.Collectors;
 
 import javax.inject.Inject;
-import javax.servlet.http.HttpServletRequest;
-import javax.servlet.http.HttpServletResponse;
+import javax.validation.Valid;
 
-import fr.treeptik.cloudunit.dto.*;
-import fr.treeptik.cloudunit.model.PortToOpen;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.hateoas.Resources;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
@@ -36,27 +37,32 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestMethod;
-import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.ResponseBody;
-import org.springframework.web.multipart.MultipartFile;
 
 import fr.treeptik.cloudunit.aspects.CloudUnitSecurable;
 import fr.treeptik.cloudunit.config.events.ApplicationFailEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationPendingEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStartEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStopEvent;
+import fr.treeptik.cloudunit.dto.ApplicationCreationRequest;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ContainerUnit;
+import fr.treeptik.cloudunit.dto.EnvUnit;
+import fr.treeptik.cloudunit.dto.HttpOk;
+import fr.treeptik.cloudunit.dto.JsonInput;
+import fr.treeptik.cloudunit.dto.JsonResponse;
+import fr.treeptik.cloudunit.dto.PortResource;
 import fr.treeptik.cloudunit.enums.RemoteExecAction;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.FatalDockerJSONException;
 import fr.treeptik.cloudunit.exception.ServiceException;
 import fr.treeptik.cloudunit.factory.EnvUnitFactory;
 import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.PortToOpen;
 import fr.treeptik.cloudunit.model.Status;
 import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.ApplicationService;
 import fr.treeptik.cloudunit.service.DockerService;
-import fr.treeptik.cloudunit.service.GitlabService;
-import fr.treeptik.cloudunit.service.JenkinsService;
 import fr.treeptik.cloudunit.utils.AuthentificationUtils;
 import fr.treeptik.cloudunit.utils.CheckUtils;
 
@@ -65,11 +71,8 @@ import fr.treeptik.cloudunit.utils.CheckUtils;
  * CloudUnit : it composed by Server, Module and Metadata
  */
 @Controller
-@RequestMapping("/application")
-public class ApplicationController implements Serializable {
-
-	private static final long serialVersionUID = 1L;
-
+@RequestMapping("/applications")
+public class ApplicationController {
 	private final Logger logger = LoggerFactory.getLogger(ApplicationController.class);
 
 	@Inject
@@ -79,43 +82,10 @@ public class ApplicationController implements Serializable {
 	private AuthentificationUtils authentificationUtils;
 
 	@Inject
-	private GitlabService gitlabService;
-
-	@Inject
-	private JenkinsService jenkinsService;
-
-	@Inject
 	private DockerService dockerService;
 
 	@Inject
 	private ApplicationEventPublisher applicationEventPublisher;
-
-	/**
-	 * To verify if an application exists or not.
-	 *
-	 * @param applicationName
-	 * @param serverName
-	 * @return
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@ResponseBody
-	@RequestMapping(value = "/verify/{applicationName}/{serverName}", method = RequestMethod.GET)
-	public JsonResponse isValid(@PathVariable String applicationName, @PathVariable String serverName)
-			throws ServiceException, CheckException {
-
-		if (logger.isInfoEnabled()) {
-			logger.info("applicationName:" + applicationName);
-			logger.info("serverName:" + serverName);
-		}
-
-		CheckUtils.validateInput(applicationName, "check.app.name");
-		CheckUtils.validateInput(serverName, "check.server.name");
-
-		applicationService.isValid(applicationName, serverName);
-
-		return new HttpOk();
-	}
 
 	/**
 	 * CREATE AN APPLICATION
@@ -126,22 +96,18 @@ public class ApplicationController implements Serializable {
 	 * @throws CheckException
 	 * @throws InterruptedException
 	 */
-	@ResponseBody
 	@RequestMapping(method = RequestMethod.POST)
-	public JsonResponse createApplication(@RequestBody JsonInput input)
+	public ResponseEntity<?> createApplication(@Valid @RequestBody ApplicationCreationRequest request)
 			throws ServiceException, CheckException, InterruptedException {
-
-		// validate the input
-		input.validateCreateApp();
-
 		// We must be sure there is no running action before starting new one
 		User user = authentificationUtils.getAuthentificatedUser();
 		authentificationUtils.canStartNewAction(user, null, Locale.ENGLISH);
 
-		// CREATE AN APP
-		applicationService.create(input.getApplicationName(), input.getLogin(), input.getServerName(), null, null);
+		Application application = applicationService.create(request.getName(), request.getDisplayName(),
+		        user.getLogin(), request.getServerType(), null, null);
 
-		return new HttpOk();
+		ApplicationResource resource = buildResource(application);
+		return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
 	}
 
 	/**
@@ -155,21 +121,15 @@ public class ApplicationController implements Serializable {
 	 * @throws InterruptedException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/restart", method = RequestMethod.POST)
-	public JsonResponse restartApplication(@RequestBody JsonInput input)
-			throws ServiceException, CheckException, InterruptedException {
+	@RequestMapping(value = "/{applicationId}/restart", method = RequestMethod.POST)
+	public ResponseEntity<?> restartApplication(@PathVariable Integer applicationId)
+			throws ServiceException, CheckException {
 
-		// validate the input
-		input.validateStartApp();
-
-		String applicationName = input.getApplicationName();
 		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
-
-		if (application != null && application.getStatus().equals(Status.PENDING)) {
-			// If application is pending do nothing
-			return new HttpErrorServer("application is pending. No action allowed.");
+		Application application = applicationService.findById(applicationId);
+		
+		if (application == null || application.getStatus().equals(Status.PENDING)) {
+		    return ResponseEntity.notFound().build();
 		}
 
 		// We must be sure there is no running action before starting new one
@@ -182,7 +142,7 @@ public class ApplicationController implements Serializable {
 			applicationService.start(application);
 		}
 
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
 	}
 
 	/**
@@ -196,23 +156,16 @@ public class ApplicationController implements Serializable {
 	 * @throws InterruptedException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/start", method = RequestMethod.POST)
-	public JsonResponse startApplication(@RequestBody JsonInput input)
-			throws ServiceException, CheckException, InterruptedException {
+	@RequestMapping(value = "/{applicationId}/start", method = RequestMethod.POST)
+	public ResponseEntity<?> startApplication(@PathVariable Integer applicationId)
+			throws ServiceException, CheckException {
+		Application application = applicationService.findById(applicationId);
 
-		// validate the input
-		input.validateStartApp();
-
-		String applicationName = input.getApplicationName();
-		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
-
-		if (application != null && application.getStatus().equals(Status.START)) {
-			// If appliction is already start, we return the status
-			return new HttpErrorServer("application already started");
+		if (application == null || application.getStatus().equals(Status.START)) {
+			return ResponseEntity.notFound().build();
 		}
 
+		User user = authentificationUtils.getAuthentificatedUser();
 		// We must be sure there is no running action before starting new one
 		authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
 
@@ -224,7 +177,7 @@ public class ApplicationController implements Serializable {
 		// wait for modules and servers starting
 		applicationEventPublisher.publishEvent(new ApplicationStartEvent(application));
 
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
 	}
 
 	/**
@@ -236,17 +189,15 @@ public class ApplicationController implements Serializable {
 	 * @throws CheckException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/stop", method = RequestMethod.POST)
-	public JsonResponse stopApplication(@RequestBody JsonInput input) throws ServiceException, CheckException {
-
-		if (logger.isDebugEnabled()) {
-			logger.debug(input.toString());
-		}
-
-		String name = input.getApplicationName();
+	@RequestMapping(value = "/{applicationId}/stop", method = RequestMethod.POST)
+	public ResponseEntity<?> stopApplication(@PathVariable Integer applicationId)
+	        throws ServiceException, CheckException {
 		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, name);
+		Application application = applicationService.findById(applicationId);
+		
+		if (application == null || application.getStatus() != Status.START) {
+		    return ResponseEntity.notFound().build();
+		}
 
 		// We must be sure there is no running action before starting new one
 		authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
@@ -258,8 +209,8 @@ public class ApplicationController implements Serializable {
 		applicationService.stop(application);
 
 		applicationEventPublisher.publishEvent(new ApplicationStopEvent(application));
-
-		return new HttpOk();
+        
+        return ResponseEntity.noContent().build();
 	}
 
 	/**
@@ -271,15 +222,11 @@ public class ApplicationController implements Serializable {
 	 * @throws CheckException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}", method = RequestMethod.DELETE)
-	public JsonResponse deleteApplication(JsonInput jsonInput) throws ServiceException, CheckException {
-
-		jsonInput.validateRemoveApp();
-
-		String applicationName = jsonInput.getApplicationName();
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
+	@RequestMapping(value = "/{applicationId}", method = RequestMethod.DELETE)
+	public ResponseEntity<?> deleteApplication(@PathVariable Integer applicationId)
+	        throws ServiceException, CheckException {
+	    User user = this.authentificationUtils.getAuthentificatedUser();
+		Application application = applicationService.findById(applicationId);
 
 		// We must be sure there is no running action before starting new one
 		authentificationUtils.canStartDeleteApplicationAction(user, application, Locale.ENGLISH);
@@ -289,7 +236,7 @@ public class ApplicationController implements Serializable {
 			// set the application in pending mode
 			applicationEventPublisher.publishEvent(new ApplicationPendingEvent(application));
 
-			logger.info("delete application :" + applicationName);
+			logger.info("Removing application: {}", application.getName());
 			applicationService.remove(application, user);
 
 		} catch (ServiceException e) {
@@ -297,27 +244,58 @@ public class ApplicationController implements Serializable {
 			applicationEventPublisher.publishEvent(new ApplicationFailEvent(application));
 		}
 
-		logger.info("Application " + applicationName + " is deleted.");
+		logger.info("Application {} is deleted.", application.getName());
 
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
+	}
+	
+	private ApplicationResource buildResource(Application application) {
+	    ApplicationResource resource = new ApplicationResource(application);
+	    
+	    try {
+    	    resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
+    	            .withSelfRel());
+    	    
+    	    resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
+    	            .withRel("deployments"));
+    	    
+    	    if (EnumSet.of(Status.START, Status.STOP).contains(application.getStatus())) {
+                resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(application.getId()))
+                        .withRel("restart"));
+                
+    	        if (application.getStatus() == Status.START) {
+    	            resource.add(linkTo(methodOn(ApplicationController.class).stopApplication(application.getId()))
+    	                    .withRel("stop"));
+    	        } else {
+    	            resource.add(linkTo(methodOn(ApplicationController.class).startApplication(application.getId()))
+    	                    .withRel("start"));
+    	        }
+    	    }
+	    } catch (ServiceException | CheckException e) {
+	        // TODO deal with exception architecture
+	        throw new RuntimeException(e);
+	    }
+	    
+	    return resource;
 	}
 
 	/**
-	 * Return detail information about application
+	 * Return detailed information about application
 	 *
 	 * @return
 	 * @throws ServiceException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}", method = RequestMethod.GET)
-	public Application detail(JsonInput jsonInput) throws ServiceException, CheckException {
-
-		jsonInput.validateDetail();
-
-		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, jsonInput.getApplicationName());
-		return application;
+	@RequestMapping(value = "/{applicationId}", method = RequestMethod.GET)
+	public ResponseEntity<?> detail(@PathVariable Integer applicationId) throws ServiceException, CheckException {
+		Application application = applicationService.findById(applicationId);
+		
+		if (application == null) {
+		    return ResponseEntity.notFound().build();
+		}
+		
+		ApplicationResource resource = buildResource(application);
+		return ResponseEntity.ok(resource);
 	}
 
 	/**
@@ -326,54 +304,21 @@ public class ApplicationController implements Serializable {
 	 * @return
 	 * @throws ServiceException
 	 */
-	@ResponseBody
 	@RequestMapping(method = RequestMethod.GET)
-	public List<Application> findAllByUser() throws ServiceException {
+	public ResponseEntity<?> findAllByUser() throws ServiceException {
 		User user = this.authentificationUtils.getAuthentificatedUser();
 		List<Application> applications = applicationService.findAllByUser(user);
 
-		logger.debug("Number of applications " + applications.size());
-		return applications;
-	}
-
-	/**
-	 * Deploy a web application
-	 *
-	 * @return
-	 * @throws IOException
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/deploy", method = RequestMethod.POST, consumes = {
-			"multipart/form-data" })
-	public JsonResponse deploy(@RequestPart("file") MultipartFile fileUpload, @PathVariable String applicationName,
-			HttpServletRequest request, HttpServletResponse response)
-			throws IOException, ServiceException, CheckException {
-
-		logger.info("applicationName = " + applicationName + "file = " + fileUpload.getOriginalFilename());
-
-		User user = authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
-
-		// We must be sure there is no running action before starting new one
-		authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
-
-        application = applicationService.deploy(fileUpload, application);
-
-		String needRestart = dockerService.getEnv(application.getServer().getContainerID(),
-				"CU_SERVER_RESTART_POST_DEPLOYMENT");
-		if ("true".equalsIgnoreCase(needRestart)){
-            // set the application in pending mode
-            applicationEventPublisher.publishEvent(new ApplicationPendingEvent(application));
-            applicationService.stop(application);
-			applicationService.start(application);
-            // wait for modules and servers starting
-            applicationEventPublisher.publishEvent(new ApplicationStartEvent(application));
-		}
-
-		logger.info("--DEPLOY APPLICATION WAR ENDED--");
-		return new HttpOk();
+		logger.debug("Number of applications {}", applications.size());
+		
+		Resources<ApplicationResource> resources = new Resources<>(
+		        applications.stream()
+		        .map(this::buildResource)
+		        .collect(Collectors.toList()));
+		
+		resources.add(linkTo(methodOn(ApplicationController.class).findAllByUser()).withSelfRel());
+		
+		return ResponseEntity.ok(resources);
 	}
 
 	/**
@@ -482,13 +427,8 @@ public class ApplicationController implements Serializable {
 		return new HttpOk();
 	}
 
-	/*
-	 * ********************************************************** / /* PORTS
-	 */
-	/*
-	 * ********************************************************** /
-	 * 
-	 * /** Add a port for an application
+	/**
+	 * Add a port for an application
 	 *
 	 * @param input
 	 * 

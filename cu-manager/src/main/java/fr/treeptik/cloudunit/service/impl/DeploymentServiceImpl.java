@@ -16,6 +16,14 @@
 
 package fr.treeptik.cloudunit.service.impl;
 
+import java.util.List;
+
+import javax.inject.Inject;
+import javax.persistence.PersistenceException;
+
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+
 import fr.treeptik.cloudunit.dao.DeploymentDAO;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.ServiceException;
@@ -24,17 +32,9 @@ import fr.treeptik.cloudunit.model.Deployment;
 import fr.treeptik.cloudunit.model.DeploymentType;
 import fr.treeptik.cloudunit.service.ApplicationService;
 import fr.treeptik.cloudunit.service.DeploymentService;
-import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
-
-import javax.inject.Inject;
-import javax.persistence.PersistenceException;
-import java.util.Date;
-import java.util.List;
 
 @Service
-public class DeploymentServiceImpl
-        implements DeploymentService {
+public class DeploymentServiceImpl implements DeploymentService {
 
     @Inject
     private DeploymentDAO deploymentDAO;
@@ -47,14 +47,8 @@ public class DeploymentServiceImpl
     public Deployment create(Application application, DeploymentType deploymentType, String contextPath)
             throws ServiceException, CheckException {
         try {
-            Deployment deployment = new Deployment();
-            deployment.setApplication(application);
-            deployment.setType(deploymentType);
-            deployment.setDate(new Date());
-            application = applicationService.findByNameAndUser(application
-                    .getUser(), application.getName());
-            application.setDeploymentStatus(Application.ALREADY_DEPLOYED);
-            application.setContextPath(contextPath);
+            Deployment deployment = application.addDeployment(contextPath, deploymentType);
+                        
             applicationService.saveInDB(application);
             return deploymentDAO.save(deployment);
         } catch (PersistenceException e) {

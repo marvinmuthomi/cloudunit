@@ -15,9 +15,13 @@
 
 package fr.treeptik.cloudunit.aspects;
 
+import fr.treeptik.cloudunit.dto.*;
 import fr.treeptik.cloudunit.exception.MonitorException;
 import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.model.*;
+import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.Deployment;
+import fr.treeptik.cloudunit.model.Message;
+import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.MessageService;
 import fr.treeptik.cloudunit.utils.MessageUtils;
 import org.aspectj.lang.JoinPoint;
@@ -83,8 +87,7 @@ public class DeploymentAspect
             Message message = null;
             switch (staticPart.getSignature().getName().toUpperCase()) {
                 case createType:
-                    message = MessageUtils.writeDeploymentMessage(user, deployment,
-                        createType);
+                    message = MessageUtils.writeDeploymentMessage(user, deployment, createType);
                     break;
             }
 

@@ -1,4 +1,4 @@
-package fr.treeptik.cloudunit.utils;
+package fr.treeptik.cloudunit.test;
 
 import org.hamcrest.Description;
 import org.hamcrest.Matcher;

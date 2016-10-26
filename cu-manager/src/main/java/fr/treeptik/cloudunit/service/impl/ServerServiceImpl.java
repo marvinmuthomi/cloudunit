@@ -15,13 +15,10 @@
 
 package fr.treeptik.cloudunit.service.impl;
 
-import java.io.UnsupportedEncodingException;
-import java.util.ArrayList;
 import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -32,8 +29,6 @@ import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
-import org.springframework.http.HttpStatus;
-import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -48,7 +43,6 @@ import fr.treeptik.cloudunit.config.events.ServerStopEvent;
 import fr.treeptik.cloudunit.dao.ApplicationDAO;
 import fr.treeptik.cloudunit.dao.ServerDAO;
 import fr.treeptik.cloudunit.dto.VolumeAssociationDTO;
-import fr.treeptik.cloudunit.dto.VolumeResource;
 import fr.treeptik.cloudunit.enums.RemoteExecAction;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.DockerJSONException;
@@ -438,7 +432,9 @@ public class ServerServiceImpl implements ServerService {
 
 	@CacheEvict(value = "env", allEntries = true)
 	@Transactional
-	public Server update(Server server, String jvmMemory, String options, String jvmRelease, boolean restorePreviousEnv)
+	@Override
+	public Server update(Server server, String jvmMemory, String options, String jvmRelease,
+	        boolean restorePreviousEnv)
 			throws ServiceException {
 
 		String previousJvmMemory = server.getJvmMemory().toString();

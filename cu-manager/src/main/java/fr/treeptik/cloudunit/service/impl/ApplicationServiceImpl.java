@@ -25,6 +25,8 @@ import java.util.Map;
 import javax.inject.Inject;
 import javax.persistence.PersistenceException;
 
+import org.apache.commons.lang.StringUtils;
+import org.apache.commons.lang.Validate;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -60,10 +62,10 @@ import fr.treeptik.cloudunit.service.FileService;
 import fr.treeptik.cloudunit.service.ImageService;
 import fr.treeptik.cloudunit.service.ModuleService;
 import fr.treeptik.cloudunit.service.ServerService;
+import fr.treeptik.cloudunit.utils.AlphaNumericsCharactersCheckUtils;
 import fr.treeptik.cloudunit.utils.AuthentificationUtils;
 import fr.treeptik.cloudunit.utils.DomainUtils;
 import fr.treeptik.cloudunit.utils.HipacheRedisUtils;
-import fr.treeptik.cloudunit.utils.NamingUtils;
 
 @Service
 public class ApplicationServiceImpl implements ApplicationService {
@@ -224,10 +226,18 @@ public class ApplicationServiceImpl implements ApplicationService {
 
 	@Override
 	@Transactional(rollbackFor = ServiceException.class)
-	public Application create(String applicationName, String login, String serverName, String tagName, String origin)
+	public Application create(String name, String displayName, String login, String serverName,
+	        String tagName, String origin)
 			throws ServiceException, CheckException {
-
-		// if tagname is null, we prefix with a ":"
+	    if (StringUtils.isBlank(name)) {
+	        Validate.isTrue(StringUtils.isNotBlank(displayName), "displayName must not be empty if name is empty");
+	        
+	        name = AlphaNumericsCharactersCheckUtils.convertToAlphaNumerics(displayName.toLowerCase());
+	    } else if (StringUtils.isBlank(displayName)) {
+	        displayName = name;
+	    }
+	    
+		// if tagname is not null, we prefix with a ":"
 		if (tagName != null) {
 			tagName = ":" + tagName;
 		}
@@ -235,7 +245,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 		logger.info("--CALL CREATE NEW APP--");
 		Application application = new Application();
 
-		logger.info("applicationName = " + applicationName + ", serverName = " + serverName);
+		logger.info("applicationName = {}, serverName = {}", displayName, serverName);
 
 		User user = authentificationUtils.getAuthentificatedUser();
 
@@ -245,8 +255,8 @@ public class ApplicationServiceImpl implements ApplicationService {
 			application.setOrigin(origin);
 		}
 
-		application.setName(applicationName);
-		application.setDisplayName(applicationName);
+		application.setName(name);
+		application.setDisplayName(displayName);
 		application.setUser(user);
 		application.setCuInstanceName(cuInstanceName);
 		application.setModules(new ArrayList<>());
@@ -483,17 +493,28 @@ public class ApplicationServiceImpl implements ApplicationService {
 			throw new ServiceException(user.toString(), e);
 		}
 	}
+	
+	@Override
+	public Application findById(Integer applicationId) throws ServiceException, CheckException {
+	    return applicationDAO.findById(applicationId);
+	}
 
 	@Override
+    @Transactional
+    public Deployment deploy(MultipartFile file, Application application) throws ServiceException, CheckException {
+        return deploy(application, null, file);
+    }
+
+    @Override
 	@Transactional
-	public Application deploy(MultipartFile file, Application application) throws ServiceException, CheckException {
+	public Deployment deploy(Application application, String contextPath, MultipartFile file) throws ServiceException, CheckException {
 		try {
 			// get app with all its components
 		    String filename = file.getOriginalFilename();
 			String containerId = application.getServer().getContainerID();
 			String tempDirectory = dockerService.getEnv(containerId, "CU_TMP");
 			fileService.sendFileToContainer(containerId, tempDirectory, file, null, null);
-			String contextPath = NamingUtils.getContext.apply(filename);
+
 			@SuppressWarnings("serial")
             Map<String, String> kvStore = new HashMap<String, String>() {
 				{
@@ -507,7 +528,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 			logger.info ("Deploy command {}", result);
 			Deployment deployment = deploymentService.create(application, DeploymentType.from(filename), contextPath);
 			application.addDeployment(deployment);
-			application.setDeploymentStatus(Application.ALREADY_DEPLOYED);
 
 			// If application is anything else than .jar or ROOT.war
 			// we need to clean for the next deployment.
@@ -520,11 +540,11 @@ public class ApplicationServiceImpl implements ApplicationService {
 				};
 				dockerService.execCommand(containerId, RemoteExecAction.CLEAN_DEPLOY.getCommand(kvStore2));
 			}
+			
+			return deployment;
 		} catch (Exception e) {
 			throw new ServiceException(e.getLocalizedMessage(), e);
 		}
-
-		return application;
 	}
 
 	@Override
