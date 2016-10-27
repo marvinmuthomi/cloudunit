@@ -256,6 +256,9 @@ public class ApplicationController {
     	    resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
     	            .withSelfRel());
     	    
+    	    resource.add(linkTo(methodOn(ServerController.class).getServer(application.getId()))
+    	            .withRel("server"));
+    	    
     	    resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
     	            .withRel("deployments"));
     	    

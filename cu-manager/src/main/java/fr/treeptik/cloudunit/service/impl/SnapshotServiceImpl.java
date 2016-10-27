@@ -263,8 +263,7 @@ public class SnapshotServiceImpl implements SnapshotService {
 			application = applicationService.findByNameAndUser(application.getUser(), application.getName());
 
 			Server server = application.getServer();
-			serverService.update(server, snapshot.getJvmMemory().toString(), snapshot.getJvmOptions(),
-					snapshot.getJvmRelease(), false);
+			serverService.update(server);
 
 			restoreModules(snapshot, application, tag);
 

@@ -13,6 +13,7 @@ import org.springframework.test.web.servlet.ResultActions;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
 import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ServerResource;
 
 public class ApplicationTemplate {
     private final MockMvc mockMvc;
@@ -78,6 +79,60 @@ public class ApplicationTemplate {
     public ResultActions deleteApplication(ApplicationResource application) throws Exception {
         String url = application.getId().getHref();
         ResultActions result = mockMvc.perform(delete(url).session(session));
+        return result;
+    }
+    
+    public ServerResource getServer(ApplicationResource application) throws Exception {
+        String url = application.getLink("server").getHref();
+        ResultActions result = mockMvc.perform(get(url).session(session))
+                .andExpect(status().isOk());
+        
+        return getServer(result);
+    }
+
+    public ServerResource getServer(ResultActions result) throws Exception {
+        String content = result.andReturn().getResponse().getContentAsString();
+        return new ObjectMapper().readValue(content, ServerResource.class);
+    }
+    
+    public ResultActions setJvmMemory(ServerResource server, Long jvmMemory) throws Exception {
+        String request = Json.createObjectBuilder()
+                .add("jvmMemory", jvmMemory)
+                .build().toString();
+        
+        String url = server.getId().getHref();
+        
+        ResultActions result = mockMvc.perform(patch(url)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+        return result;
+    }
+
+    public ResultActions setJvmOptions(ServerResource server, String jvmOptions) throws Exception {
+        String request = Json.createObjectBuilder()
+                .add("jvmOptions", jvmOptions)
+                .build().toString();
+        
+        String url = server.getId().getHref();
+        
+        ResultActions result = mockMvc.perform(patch(url)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+        return result;
+    }
+
+    
+    public ResultActions setServer(ServerResource server) throws Exception {
+        String request = new ObjectMapper().writeValueAsString(server);
+        
+        String url = server.getId().getHref();
+        
+        ResultActions result = mockMvc.perform(put(url)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
         return result;
     }
 }

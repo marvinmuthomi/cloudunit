@@ -27,7 +27,6 @@ import javax.servlet.Filter;
 
 import org.junit.After;
 import org.junit.Before;
-import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
@@ -51,6 +50,7 @@ import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
 import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ServerResource;
 import fr.treeptik.cloudunit.exception.ServiceException;
 import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
 import fr.treeptik.cloudunit.model.User;
@@ -88,11 +88,9 @@ public abstract class AbstractApplicationControllerTestIT {
     private ApplicationTemplate applicationTemplate;
 
     private final String serverType;
-    private final String jvmRelease;
 
-    protected AbstractApplicationControllerTestIT(final String release, final String jvmRelease) {
-        this.serverType = release;
-        this.jvmRelease = jvmRelease;
+    protected AbstractApplicationControllerTestIT(String serverType) {
+        this.serverType = serverType;
     }
 
     @Before
@@ -129,28 +127,17 @@ public abstract class AbstractApplicationControllerTestIT {
         session.invalidate();
     }
 
-    /**
-     * We cannot create an application with an empty name.
-     *
-     * @throws Exception
-     */
     @Test
     public void test_failCreateEmptyNameApplication() throws Exception {
         ResultActions result = applicationTemplate.createApplication("", serverType);
         result.andExpect(status().is4xxClientError());
     }
 
-    /**
-     * We cannot create an application with an wrong syntax name.
-     *
-     * @throws Exception
-     */
     @Test(timeout = 30000)
     public void test_failCreateWrongNameApplication() throws Exception {
         ResultActions result = applicationTemplate.createApplication("         ", serverType);
         result.andExpect(status().is4xxClientError());
     }
-
 
     @Test
     public void test_createAccentNameApplication() throws Exception {
@@ -163,7 +150,6 @@ public abstract class AbstractApplicationControllerTestIT {
         
         applicationTemplate.deleteApplication(application);
     }
-
 
     @Test()
     public void test_startStopStartApplicationTest() throws Exception {
@@ -181,90 +167,78 @@ public abstract class AbstractApplicationControllerTestIT {
             .andExpect(status().isNoContent());
     }
 
-    @Ignore
     @Test
     public void test_changeJvmMemorySizeApplicationTest() throws Exception {
         ApplicationResource application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
-
-        logger.info("Change JVM Memory");
-        String jsonString = Json.createObjectBuilder()
-                .add("jvmMemory", "1024")
-                .build().toString();
-        
-        String serverUrl = application.getLink("server").getHref();
-        
-        ResultActions results = mockMvc.perform(patch(serverUrl)
-                .session(session)
-                .contentType(MediaType.APPLICATION_JSON)
-                .content(jsonString));
-        results.andExpect(status().isOk());
-
-        results = mockMvc.perform(get(serverUrl)
-                .session(session)
-                .contentType(MediaType.APPLICATION_JSON));
-        results.andExpect(jsonPath("$.jvmMemory").value(1024));
-
-        applicationTemplate.deleteApplication(application);
+        try {
+            ServerResource server = applicationTemplate.getServer(application);
+            
+            ResultActions result = applicationTemplate.setJvmMemory(server, 1024L);
+            result.andExpect(status().isOk());
+            
+            server = applicationTemplate.getServer(result);
+    
+            assertEquals(server.getJvmMemory().longValue(), 1024L);
+        } finally {
+            applicationTemplate.deleteApplication(application);
+        }
     }
 
-    @Ignore
     @Test(timeout = 30000)
     public void test_changeInvalidJvmMemorySizeApplicationTest() throws Exception {
         ApplicationResource application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
-
-        logger.info("Change JVM Memory size with an incorrect value : number not allowed");
-        String jsonString =
-                "{\"applicationName\":\"" + applicationName
-                        + "\",\"jvmMemory\":\"666\",\"jvmOptions\":\"\",\"jvmRelease\":\"\"}";
-        ResultActions resultats =
-                mockMvc.perform(put("/server/configuration/jvm").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().is4xxClientError());
-
-        logger.info("Change JVM Memory size with an empty value");
-        jsonString =
-                "{\"applicationName\":\"" + applicationName
-                        + "\",\"jvmMemory\":\"\",\"jvmOptions\":\"\",\"jvmRelease\":\""+jvmRelease+"\"}";
-        resultats =
-                mockMvc.perform(put("/server/configuration/jvm").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().is4xxClientError());
-
-        applicationTemplate.deleteApplication(application);
+        try {
+            ServerResource server = applicationTemplate.getServer(application);
+            
+            ResultActions result = applicationTemplate.setJvmMemory(server, 666L);
+            result.andExpect(status().isBadRequest());
+        } finally {
+            applicationTemplate.deleteApplication(application);
+        }
+    }
+    
+    @Test(timeout = 30000)
+    public void test_changeEmptyJvmMemorySizeApplicationTest() throws Exception {
+        ApplicationResource application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
+        try {
+            ServerResource server = applicationTemplate.getServer(application);
+            
+            server.setJvmMemory(null);
+            
+            ResultActions result = applicationTemplate.setServer(server);
+            result.andExpect(status().isBadRequest());            
+        } finally {
+            applicationTemplate.deleteApplication(application);
+        }
     }
 
-    @Ignore
     @Test(timeout = 60000)
     public void test_changeJvmOptionsApplicationTest() throws Exception {
         ApplicationResource application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
-
-        logger.info("Change JVM Options !");
-        String jsonString =
-                "{\"applicationName\":\"" + applicationName
-                       + "\",\"jvmMemory\":\"512\",\"jvmOptions\":\"-Dkey1=value1\",\"jvmRelease\":\""+jvmRelease+"\"}";
-        ResultActions resultats =
-                mockMvc.perform(put("/server/configuration/jvm").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().isOk());
-
-        resultats = mockMvc.perform(get("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON));
-        resultats.andExpect(jsonPath("$.server.jvmMemory").value(512)).andExpect(jsonPath(
-                "$.server.jvmRelease").value(jvmRelease)).andExpect(jsonPath(
-                "$.server.jvmOptions").value("-Dkey1=value1"));
-
-        applicationTemplate.deleteApplication(application);
+        try {
+            ServerResource server = applicationTemplate.getServer(application);
+            
+            ResultActions result = applicationTemplate.setJvmOptions(server, "-Dkey1=value1");
+            result.andExpect(status().isOk());
+            server = applicationTemplate.getServer(result);
+            
+            assertEquals(server.getJvmOptions(), "-Dkey1=value1");
+        } finally {
+            applicationTemplate.deleteApplication(application);
+        }        
     }
 
-    @Ignore
     @Test(timeout = 30000)
-    public void test_changeFailWithXmsJvmOptionsApplicationTest()
-            throws Exception {
+    public void test_changeFailWithXmsJvmOptionsApplicationTest() throws Exception {
         ApplicationResource application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
-        logger.info("Change JVM With Xms : not allowed");
-        String jsonString =
-                "{\"applicationName\":\"" + applicationName
-                        + "\",\"jvmMemory\":\"512\",\"jvmOptions\":\"-Xms=512m\",\"jvmRelease\":\""+jvmRelease+"\"}";
-        ResultActions resultats =
-                mockMvc.perform(put("/server/configuration/jvm").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().is4xxClientError());
-        applicationTemplate.deleteApplication(application);
+        try {
+            ServerResource server = applicationTemplate.getServer(application);
+            
+            ResultActions result = applicationTemplate.setJvmOptions(server, "-Xms=512m");
+            result.andExpect(status().isBadRequest());
+        } finally {
+            applicationTemplate.deleteApplication(application);
+        }
     }
 
     @Test()

@@ -2,6 +2,7 @@ package fr.treeptik.cloudunit.dto;
 
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
+import static org.junit.Assume.*;
 
 import java.util.Set;
 
@@ -21,11 +22,8 @@ public class ApplicationCreationRequestValidationTest {
     public void setUp() {
         ValidatorFactory validatorFactory = Validation.buildDefaultValidatorFactory();
         this.validator = validatorFactory.getValidator();
-    }
-    
-    @Test
-    public void testValidator() {
-        assertNotNull(validator);
+        
+        assumeNotNull(validator);
     }
     
     @Test
