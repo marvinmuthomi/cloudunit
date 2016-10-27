@@ -49,7 +49,7 @@ public interface ApplicationDAO extends JpaRepository<Application, Integer> {
 	public List<Application> findAllByUser(@Param("userId") Integer userId,
 			@Param("cuInstanceName") String cuInstanceName) throws DataAccessException;
 
-	@Query("select al from Application a left join a.aliases al where a.name=:name "
+	@Query("select al from Application a join a.aliases al where a.name=:name "
 			+ "and a.cuInstanceName=:cuInstanceName")
 	public List<String> findAllAliases(@Param("name") String applicationName,
 			@Param("cuInstanceName") String cuInstanceName) throws DataAccessException;

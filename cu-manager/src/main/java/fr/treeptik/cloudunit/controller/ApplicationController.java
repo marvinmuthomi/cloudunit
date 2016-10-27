@@ -21,6 +21,7 @@ import java.net.URI;
 import java.util.EnumSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 import javax.inject.Inject;
@@ -44,6 +45,7 @@ import fr.treeptik.cloudunit.config.events.ApplicationFailEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationPendingEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStartEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStopEvent;
+import fr.treeptik.cloudunit.dto.AliasResource;
 import fr.treeptik.cloudunit.dto.ApplicationCreationRequest;
 import fr.treeptik.cloudunit.dto.ApplicationResource;
 import fr.treeptik.cloudunit.dto.ContainerUnit;
@@ -262,6 +264,9 @@ public class ApplicationController {
     	    resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
     	            .withRel("deployments"));
     	    
+    	    resource.add(linkTo(methodOn(ApplicationController.class).aliases(application.getId()))
+    	            .withRel("aliases"));
+    	    
     	    if (EnumSet.of(Status.START, Status.STOP).contains(application.getStatus())) {
                 resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(application.getId()))
                         .withRel("restart"));
@@ -340,6 +345,19 @@ public class ApplicationController {
 		logger.debug("applicationName:" + applicationName);
 		return applicationService.listContainers(applicationName);
 	}
+	
+	private AliasResource buildAliasResource(Application application, String alias) {
+	    AliasResource resource = new AliasResource(alias);
+	    
+	    try {
+            resource.add(linkTo(methodOn(ApplicationController.class).alias(application.getId(), alias))
+                    .withSelfRel());
+        } catch (CheckException | ServiceException e) {
+            // ignore
+        }
+	    
+	    return resource;
+	}
 
 	/**
 	 * Return the list of aliases for an application
@@ -349,15 +367,30 @@ public class ApplicationController {
 	 * @throws CheckException
 	 */
 	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/alias", method = RequestMethod.GET)
-	public List<String> aliases(JsonInput jsonInput) throws ServiceException, CheckException {
-		logger.debug("application.name = " + jsonInput.getApplicationName());
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, jsonInput.getApplicationName());
+	@RequestMapping(value = "/{applicationId}/aliases", method = RequestMethod.GET)
+	public ResponseEntity<?> aliases(@PathVariable Integer applicationId) throws ServiceException, CheckException {
+		Application application = applicationService.findById(applicationId);
+		
+		if (application == null) {
+		    ResponseEntity.notFound().build();
+		}
+		
+		logger.debug("application name = {}", application.getName());
+		
 		List<String> aliases = applicationService.getListAliases(application);
-		if (logger.isDebugEnabled() && aliases != null)
-			logger.debug(aliases.toString());
-		return aliases;
+		
+		if (aliases == null) {
+		    ResponseEntity.notFound().build();
+		}
+		
+		Resources<AliasResource> resources = new Resources<>(
+		        aliases.stream()
+		        .map(a -> buildAliasResource(application, a))
+		        .collect(Collectors.toList()));
+		
+		resources.add(linkTo(methodOn(ApplicationController.class).aliases(applicationId)).withSelfRel());
+		
+		return ResponseEntity.ok(resources);
 	}
 
 	/**
@@ -370,26 +403,50 @@ public class ApplicationController {
 	 */
 	@CloudUnitSecurable
 	@ResponseBody
-	@RequestMapping(value = "/alias", method = RequestMethod.POST)
-	public JsonResponse addAlias(@RequestBody JsonInput input) throws ServiceException, CheckException {
-
-		if (logger.isDebugEnabled()) {
-			logger.debug(input.toString());
-		}
-
+	@RequestMapping(value = "/{applicationId}/aliases", method = RequestMethod.POST)
+	public ResponseEntity<?> addAlias(@PathVariable Integer applicationId, @Valid @RequestBody AliasResource request)
+	        throws ServiceException, CheckException {
 		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, input.getApplicationName());
-
-		CheckUtils.validateInput(input.getApplicationName(), "check.app.name");
-		CheckUtils.validateInput(input.getAlias(), "check.alias.name");
+		Application application = applicationService.findById(applicationId);
 
 		// We must be sure there is no running action before starting new one
-		this.authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
+		authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
 
-		this.applicationService.addNewAlias(application, input.getAlias());
-
-		return new HttpOk();
+		String alias = applicationService.addNewAlias(application, request.getName());
+		
+		AliasResource resource = buildAliasResource(application, alias);
+		
+		return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
 	}
+	
+    @RequestMapping(value = "/{applicationId}/aliases/{aliasName}", method = RequestMethod.GET)
+    public ResponseEntity<?> alias(@PathVariable Integer applicationId, @PathVariable String aliasName)
+            throws ServiceException, CheckException {
+        Application application = applicationService.findById(applicationId);
+        
+        if (application == null) {
+            ResponseEntity.notFound().build();
+        }
+        
+        logger.debug("application name = {}", application.getName());
+        
+        List<String> aliases = applicationService.getListAliases(application);
+        
+        if (aliases == null) {
+            ResponseEntity.notFound().build();
+        }
+        
+        Optional<String> alias = aliases.stream()
+                .filter(a -> a.equals(aliasName))
+                .findAny();
+        
+        if (!alias.isPresent()) {
+            ResponseEntity.notFound().build();
+        }
+        
+        AliasResource resource = buildAliasResource(application, alias.get());
+        return ResponseEntity.ok(resource);
+    }	
 
 	/**
 	 * Delete an alias for an application
@@ -401,33 +458,38 @@ public class ApplicationController {
 	 */
 	@CloudUnitSecurable
 	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/alias/{alias}", method = RequestMethod.DELETE)
-	public JsonResponse removeAlias(JsonInput jsonInput) throws ServiceException, CheckException {
-
-		String applicationName = jsonInput.getApplicationName();
-		String alias = jsonInput.getAlias();
-
-		if (logger.isDebugEnabled()) {
-			logger.debug("application.name=" + applicationName);
-			logger.debug("alias.name=" + alias);
-		}
-
-		if (applicationName != null) {
-			applicationName = applicationName.toLowerCase();
-		}
-		if (alias != null) {
-			alias = alias.toLowerCase();
-		}
+	@RequestMapping(value = "/{applicationId}/aliases/{aliasName}", method = RequestMethod.DELETE)
+	public ResponseEntity<?> removeAlias(@PathVariable Integer applicationId, @PathVariable String aliasName)
+	        throws ServiceException, CheckException {
+		logger.debug("application id: {}; alias name: {}", applicationId, aliasName);
 
 		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
+		Application application = applicationService.findById(applicationId);
+		
+        if (application == null) {
+            ResponseEntity.notFound().build();
+        }
+        
+        List<String> aliases = applicationService.getListAliases(application);
+        
+        if (aliases == null) {
+            ResponseEntity.notFound().build();
+        }
+        
+        Optional<String> alias = aliases.stream()
+                .filter(a -> a.equals(aliasName))
+                .findAny();
+        
+        if (!alias.isPresent()) {
+            ResponseEntity.notFound().build();
+        }
 
 		// We must be sure there is no running action before starting new one
 		authentificationUtils.canStartNewAction(user, null, Locale.ENGLISH);
 
-		applicationService.removeAlias(application, alias);
+		applicationService.removeAlias(application, aliasName);
 
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
 	}
 
 	/**

@@ -5,13 +5,16 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import javax.json.Json;
 
+import org.springframework.hateoas.Resources;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 
+import fr.treeptik.cloudunit.dto.AliasResource;
 import fr.treeptik.cloudunit.dto.ApplicationResource;
 import fr.treeptik.cloudunit.dto.ServerResource;
 
@@ -133,6 +136,47 @@ public class ApplicationTemplate {
                 .session(session)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content(request));
+        return result;
+    }
+    
+    public ResultActions addAlias(ApplicationResource application, String name) throws Exception {
+        String request = Json.createObjectBuilder()
+                .add("name", name)
+                .build().toString();
+        
+        String url = application.getLink("aliases").getHref();
+        
+        ResultActions result = mockMvc.perform(post(url)
+                .session(session)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(request));
+        return result;
+    }
+    
+    public Resources<AliasResource> getAliases(ApplicationResource application) throws Exception {
+        String url = application.getLink("aliases").getHref();
+        
+        ResultActions result = mockMvc.perform(get(url)
+                .session(session));
+        result.andExpect(status().isOk());
+        return getAliases(result);
+    }
+
+    private Resources<AliasResource> getAliases(ResultActions result) throws Exception {
+        String content = result.andReturn().getResponse().getContentAsString();
+        return new ObjectMapper().readValue(content, new TypeReference<Resources<AliasResource>>() {});
+    }
+    
+    public AliasResource getAlias(ResultActions result) throws Exception {
+        String content = result.andReturn().getResponse().getContentAsString();
+        return new ObjectMapper().readValue(content, AliasResource.class);
+    }
+    
+    public ResultActions removeAlias(AliasResource alias) throws Exception {
+        String url = alias.getId().getHref();
+        
+        ResultActions result = mockMvc.perform(delete(url)
+                .session(session));
         return result;
     }
 }

@@ -61,7 +61,7 @@ public interface ApplicationService {
 
 	List<String> getListAliases(Application application) throws ServiceException;
 
-	void addNewAlias(Application application, String alias) throws ServiceException, CheckException;
+    String addNewAlias(Application application, String alias) throws ServiceException, CheckException;
 
 	void updateAliases(Application application) throws ServiceException;
 

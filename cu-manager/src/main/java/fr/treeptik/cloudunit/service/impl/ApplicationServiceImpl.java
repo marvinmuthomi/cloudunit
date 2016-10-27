@@ -595,10 +595,9 @@ public class ApplicationServiceImpl implements ApplicationService {
 		}
 	}
 
-	@Override
+    @Override
 	@Transactional
-	public void addNewAlias(Application application, String alias) throws ServiceException, CheckException {
-
+	public String addNewAlias(Application application, String alias) throws ServiceException, CheckException {
 		logger.info("ALIAS VALUE IN addNewAlias : " + alias);
 
 		alias = alias.toLowerCase();
@@ -621,6 +620,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 					dockerService.getEnv(server.getContainerID(), "CU_SERVER_PORT"));
 			applicationDAO.save(application);
 
+			return alias;
 		} catch (DataAccessException | FatalDockerJSONException e) {
 			throw new ServiceException(e.getLocalizedMessage(), e);
 		}
