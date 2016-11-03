@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly9ElasticSearch24ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly9ElasticSearch24ModuleControllerTestIT() {
-        super.server = "wildfly-9";
-        super.module = "elasticsearch-2.4";
+        super.serverType = "wildfly-9";
+        super.moduleName = "elasticsearch-2.4";
         super.numberPort = "9200";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Wildfly9ElasticSearch24ModuleControllerTestIT extends AbstractModul
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckElasticSearchConnection().invoke(forwardedPort);
     }
 }

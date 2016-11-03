@@ -38,8 +38,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Tomcat8Postgres95ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Tomcat8Postgres95ModuleControllerTestIT() {
-        super.server = "tomcat-8";
-        super.module = "postgresql-9-5";
+        super.serverType = "tomcat-8";
+        super.moduleName = "postgresql-9-5";
         super.numberPort = "5432";
         super.managerPrefix = "phppgadmin";
         super.managerSuffix = "phppgadmin";
@@ -47,7 +47,7 @@ public class Tomcat8Postgres95ModuleControllerTestIT extends AbstractModuleContr
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckDatabaseConnection().invoke(forwardedPort, "POSTGRES_USER",
                 "POSTGRES_PASSWORD", "POSTGRES_DB", "org.postgresql.Driver", "jdbc:postgresql://");
     }

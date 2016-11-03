@@ -30,6 +30,7 @@ import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.hateoas.Link;
 import org.springframework.hateoas.Resources;
 import org.springframework.mock.web.MockHttpSession;
@@ -72,8 +73,10 @@ public class AliasControllerTestIT {
 
     private final String serverType = "tomcat-8";
 
-    private final String domainSuffix = ".cloudunit.dev";
+    @Value("${suffix.cloudunit.io}")
+    private String domainSuffix;
     
+    @Value("myalias${suffix.cloudunit.io}")
     private final String aliasName = "myalias" + domainSuffix;
     
     @Inject
@@ -110,9 +113,7 @@ public class AliasControllerTestIT {
 
     @Before
     public void setUp() throws Exception {
-        mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(springSecurityFilterChain)
-                .build();
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 
         User user = null;
         try {
@@ -134,13 +135,11 @@ public class AliasControllerTestIT {
         applicationTemplate = new ApplicationTemplate(mockMvc, session);
 
         application1 = applicationTemplate.createAndAssumeApplication(applicationName1, serverType);
-        application2 = applicationTemplate.createAndAssumeApplication(applicationName2, serverType);        
     }
 
     @After
     public void tearDown() throws Exception {
-        applicationTemplate.deleteApplication(application2);
-        applicationTemplate.deleteApplication(application1);
+        applicationTemplate.removeApplication(application1);
 
         SecurityContextHolder.clearContext();
         session.invalidate();
@@ -170,8 +169,13 @@ public class AliasControllerTestIT {
         ResultActions result = applicationTemplate.addAlias(application1, aliasName);
         result.andExpect(status().isCreated());
         
+        application2 = applicationTemplate.createAndAssumeApplication(applicationName2, serverType);
+        try {
         result = applicationTemplate.addAlias(application2, aliasName);
         result.andExpect(status().isBadRequest());
+        } finally {
+            applicationTemplate.removeApplication(application2);
+        }
     }
     
     public void test_okRemoveSchema(String schema) throws Exception {
@@ -245,7 +249,7 @@ public class AliasControllerTestIT {
         alias.add(new Link(application1.getId().getHref() + "/aliases/dzqmokdzq"));
         
         ResultActions result = applicationTemplate.removeAlias(alias);
-        result.andExpect(status().isNotFound());        
+        result.andExpect(status().isNotFound());
     }
 
     @Test(timeout = 60000)

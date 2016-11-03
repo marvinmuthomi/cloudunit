@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly9Redis32ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly9Redis32ModuleControllerTestIT() {
-        super.server = "wildfly-9";
-        super.module = "redis-3-2";
+        super.serverType = "wildfly-9";
+        super.moduleName = "redis-3-2";
         super.numberPort = "6379";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Wildfly9Redis32ModuleControllerTestIT extends AbstractModuleControl
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
             new CheckRedisConnection().invoke(forwardedPort);
     }
 }

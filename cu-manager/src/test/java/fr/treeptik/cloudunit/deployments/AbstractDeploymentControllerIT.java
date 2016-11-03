@@ -3,136 +3,87 @@ package fr.treeptik.cloudunit.deployments;
 import static fr.treeptik.cloudunit.utils.TestUtils.*;
 import static org.hamcrest.Matchers.*;
 import static org.junit.Assert.*;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
 
-import java.io.IOException;
 import java.util.Optional;
 import java.util.Random;
-import java.util.stream.Stream;
 
-import javax.annotation.PostConstruct;
 import javax.inject.Inject;
 import javax.servlet.Filter;
 
-import org.apache.http.ParseException;
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
+import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
-import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
+import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.authentication.AuthenticationManager;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.web.context.HttpSessionSecurityContextRepository;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.ContextConfiguration;
+import org.springframework.test.context.junit4.SpringJUnit4ClassRunner;
+import org.springframework.test.context.web.WebAppConfiguration;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.ResultActions;
-import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.DeploymentResource;
 import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
 import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.ApplicationTemplate;
 import fr.treeptik.cloudunit.utils.TestUtils;
 
+@RunWith(SpringJUnit4ClassRunner.class)
+@WebAppConfiguration
+@ContextConfiguration(classes = {
+        CloudUnitApplicationContext.class,
+        MockServletContext.class
+        })
+@ActiveProfiles("integration")
 public abstract class AbstractDeploymentControllerIT {
-
-    protected static String applicationName;
+    private static final String WAR_FILE_URL_TEMPLATE =
+            "https://github.com/Treeptik/CloudUnit/releases/download/1.0/%s.war";
+    
     protected final Logger logger = LoggerFactory.getLogger(AbstractDeploymentControllerIT.class);
-    protected String release;
-    protected MockMvc mockMvc;
-    protected MockHttpSession session;
-    @Autowired
+
+    @Value("${suffix.cloudunit.io}")
+    protected String domain;
+    protected final String serverType;
+    
+    @Inject
     private WebApplicationContext context;
     @Inject
     private AuthenticationManager authenticationManager;
-    @Autowired
+    @Inject
     private Filter springSecurityFilterChain;
     @Inject
     private UserService userService;
-    @Value("${suffix.cloudunit.io}")
-    private String domainSuffix;
-    @Value("#{systemEnvironment['CU_SUB_DOMAIN']}")
-    private String subdomain;
-    protected String domain;
+    
+    protected String applicationName;
+    
+    protected MockMvc mockMvc;
+    protected MockHttpSession session;
 
-    public AbstractDeploymentControllerIT() {
-        super();
-    }
+    protected ApplicationTemplate applicationTemplate;
+    protected ApplicationResource application;
 
-    protected ResultActions deployApp(String appName) throws Exception {
-        logger.info("Deploy application : " + appName);
-        return mockMvc.perform(MockMvcRequestBuilders.fileUpload("/application/" + applicationName + "/deploy")
-                .file(downloadAndPrepareFileToDeploy(appName + ".war", "https://github.com/Treeptik/CloudUnit/releases/download/1.0/" + appName + ".war"))
-                .session(session).contentType(MediaType.MULTIPART_FORM_DATA))
-                .andDo(print());
-    }
-
-    protected ResultActions removeModule(String module) throws Exception {
-        logger.info("Remove module : " + module);
-        return mockMvc.perform(delete("/module/" + applicationName + "/" + module).session(session).contentType(MediaType.APPLICATION_JSON)).andDo(print());
-    }
-
-    protected ResultActions addModule(String module) throws Exception {
-        logger.info("Add module : " + module);
-        String jsonString = "{\"applicationName\":\"" + applicationName + "\", \"imageName\":\"" + module + "\"}";
-        return mockMvc.perform(post("/module").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString)).andDo(print());
-    }
-
-    protected ResultActions createApplication() throws Exception {
-        logger.info("Create Tomcat server");
-        String jsonString = "{\"applicationName\":\"" + applicationName + "\", \"serverName\":\"" + release + "\"}";
-        return mockMvc.perform(post("/application").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-    }
-
-    protected ResultActions deployArchive(String nameArchive, String urlArchive) throws Exception {
-        logger.info("Deploy archive : " + nameArchive);
-        return mockMvc.perform(MockMvcRequestBuilders.fileUpload("/application/" + applicationName + "/deploy")
-                .file(downloadAndPrepareFileToDeploy(nameArchive, urlArchive)).
-                        session(session).contentType(MediaType.MULTIPART_FORM_DATA)).andDo(print());
-    }
-
-    protected ResultActions deleteApplication() throws Exception {
-        logger.info("Delete application : " + applicationName);
-        return mockMvc.perform(delete("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON));
+    public AbstractDeploymentControllerIT(String serverType) {
+        this.serverType = serverType;
     }
     
-    protected Optional<String> waitForContent(String url) {
-        return Stream.generate(() -> {
-                    try {
-                        Thread.sleep(1000);
-                        return getUrlContentPage(url);
-                    } catch (ParseException | IOException | InterruptedException e) {
-                        return null;
-                    } finally {
-                        
-                    }
-                })
-            .limit(TestUtils.NB_ITERATION_MAX)
-            .filter(content -> content != null && !content.contains("404"))
-            .findFirst();
-    }
-
-    @PostConstruct
-    public void init() {
-        if (subdomain != null) {
-            domain = subdomain + domainSuffix;
-        } else {
-            domain = domainSuffix;
-        }
-    }
-
     @Before
-    public void setup() {
-        logger.info("setup");
+    public void setUp() {
         applicationName = "App" + new Random().nextInt(100000);
         this.mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         User user = null;
@@ -151,23 +102,24 @@ public abstract class AbstractDeploymentControllerIT {
         securityContext.setAuthentication(result);
         session = new MockHttpSession();
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        
+        applicationTemplate = new ApplicationTemplate(mockMvc, session);
     }
 
     @After
-    public void teardown() throws Exception {
-        logger.info("teardown");
+    public void tearDown() throws Exception {
         SecurityContextHolder.clearContext();
         session.invalidate();
     }
 
     @Test
     public void test_deploySimpleWithoutContextApplicationTest() throws Exception {
-        deploySimpleApplicationTest("ROOT.war", "/");
+        deploySimpleApplicationTest("ROOT");
     }
 
     @Test
     public void test_deploySimpleWithContextApplicationTest() throws Exception {
-        deploySimpleApplicationTest("helloworld.war", "/helloworld");
+        deploySimpleApplicationTest("helloworld");
     }
 
     @Test
@@ -205,45 +157,83 @@ public abstract class AbstractDeploymentControllerIT {
         try {
             // add the module before deploying war
             addModule(module)
-                    .andExpect(status().isOk());
+                    .andExpect(status().isCreated());
     
             // deploy the war
-            logger.info("Deploy an " + module + " based application");
-            deployApp(appName)
-                .andExpect(status().is2xxSuccessful());
-    
-            // test the application content page
-            String urlToCall = String.format("http://%s-johndoe-admin%s/%s",
+            logger.info("Deploy a(n) {} based application", module);
+            ResultActions result = deploy(appName);
+            result.andExpect(status().isCreated());
+            
+            DeploymentResource deployment = applicationTemplate.getDeployment(result);
+            
+            String url = deployment.getLink("open").getHref();
+            
+            String expectedUrl = String.format("http://%s-johndoe-admin%s/%s",
                     applicationName.toLowerCase(),
-                    domain, appName);
+                    domain,
+                    contextPath(appName));
+            
+            assertEquals(expectedUrl, url);
     
-            Optional<String> contentPage = waitForContent(urlToCall);
+            Optional<String> contentPage = TestUtils.waitForContent(url);
             assertTrue(contentPage.isPresent());
-            assertThat(contentPage.get(), containsString(keywordInPage));
-    
-            // remove the module
-            removeModule(module)
-                .andExpect(status().isOk());
+            assertThat(contentPage.get(), containsString(keywordInPage));    
         } finally {
             deleteApplication();
         }
     }
 
-    private void deploySimpleApplicationTest(String archiveName, String context) throws Exception {
+    private void deploySimpleApplicationTest(String appName) throws Exception {
         createApplication();
         try {
             logger.info("Deploy an helloworld application");
-            deployArchive(
-                    archiveName,
-                    "https://github.com/Treeptik/CloudUnit/releases/download/1.0/" + archiveName);
-            String urlToCall = String.format("http://%s-johndoe-admin%s/%s",
+            ResultActions result = deploy(appName);
+            result.andExpect(status().isCreated());
+            
+            DeploymentResource deployment = applicationTemplate.getDeployment(result);
+            
+            String url = deployment.getLink("open").getHref();
+            
+            String expectedUrl = String.format("http://%s-johndoe-admin%s/%s",
                     applicationName.toLowerCase(),
-                    domain, context);
-            String content = getUrlContentPage(urlToCall);
+                    domain,
+                    contextPath(appName));
+            
+            assertEquals(expectedUrl, url);
+            
+            String content = getUrlContentPage(url);
+            
             assertThat(content, containsString("CloudUnit PaaS"));
         } finally {
             deleteApplication();
         }
     }
 
+    protected void createApplication() throws Exception {
+        logger.info("Create Tomcat server");
+        application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
+    }
+
+    protected void deleteApplication() throws Exception {
+        logger.info("Delete application : " + applicationName);
+        applicationTemplate.removeApplication(application)
+            .andExpect(status().isNoContent());
+    }
+
+    protected ResultActions deploy(String appName) throws Exception {
+        logger.info("Deploy application : " + appName);
+        return applicationTemplate.addDeployment(
+                application,
+                "/" + contextPath(appName),
+                String.format(WAR_FILE_URL_TEMPLATE, appName));
+    }
+
+    private String contextPath(String appName) {
+        return appName.equals("ROOT") ? "" : appName;
+    }
+
+    protected ResultActions addModule(String moduleName) throws Exception {
+        logger.info("Add module : " + moduleName);
+        return applicationTemplate.addModule(application, moduleName);
+    }
 }

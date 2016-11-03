@@ -23,17 +23,18 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Tomcat8Mysql55ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Tomcat8Mysql55ModuleControllerTestIT() {
-        super.server = "tomcat-8";
-        super.module = "mysql-5-5";
+        super.serverType = "tomcat-8";
+        super.moduleName = "mysql-5-5";
         super.numberPort = "3306";
         super.managerPrefix = "phpmyadmin";
         super.managerSuffix = "phpmyadmin";
         super.managerPageContent = "phpMyAdmin";
-        super.testScriptPath = "src/test/resources/mysql/test.sql";    }
+        super.testScriptPath = "src/test/resources/mysql/test.sql";
+    }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
-        new CheckDatabaseConnection().invoke(forwardedPort, "MYSQL_USER",
-                "MYSQL_PASSWORD", "MYSQL_DATABASE", "com.mysql.jdbc.Driver", "jdbc:mysql://");
+    protected void checkConnection(String forwardedPort) throws Exception {
+        new CheckDatabaseConnection().invoke(forwardedPort, "MYSQL_USER", "MYSQL_PASSWORD", "MYSQL_DATABASE",
+                "com.mysql.jdbc.Driver", "jdbc:mysql://");
     }
 }

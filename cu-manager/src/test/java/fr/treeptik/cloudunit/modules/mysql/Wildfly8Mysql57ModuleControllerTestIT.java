@@ -38,8 +38,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly8Mysql57ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly8Mysql57ModuleControllerTestIT() {
-        super.server = "wildfly-8";
-        super.module = "mysql-5-7";
+        super.serverType = "wildfly-8";
+        super.moduleName = "mysql-5-7";
         super.numberPort = "3306";
         super.managerPrefix = "phpmyadmin";
         super.managerSuffix = "phpmyadmin";
@@ -47,7 +47,7 @@ public class Wildfly8Mysql57ModuleControllerTestIT extends AbstractModuleControl
         super.testScriptPath = "src/test/resources/mysql/test.sql";    }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckDatabaseConnection().invoke(forwardedPort, "MYSQL_USER",
                 "MYSQL_PASSWORD", "MYSQL_DATABASE", "com.mysql.jdbc.Driver", "jdbc:mysql://");
     }}

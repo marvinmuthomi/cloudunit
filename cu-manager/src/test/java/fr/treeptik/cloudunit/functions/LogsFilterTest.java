@@ -1,9 +1,8 @@
 package fr.treeptik.cloudunit.functions;
-import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import org.junit.Assert;
-import org.junit.Before;
 import org.junit.Test;
 
 import fr.treeptik.cloudunit.dto.LogResource;
@@ -12,26 +11,11 @@ import fr.treeptik.cloudunit.dto.LogResource;
  * Created by nicolas on 04/01/2016.
  */
 public class LogsFilterTest {
-
-    private List<LogResource> logs;
-
-    @Before
-    public void init() {
-        logs = new ArrayList<>();
-        LogResource line1 = new LogResource("catalina.out", "Hello, I am a log stackstrace!");
-        LogResource line2 = new LogResource("catalina.out", "Goodbye, I am an another message!");
-        LogResource line3 = new LogResource("localhost.txt", "Goodbye, I am an wrong message!");
-        LogResource line4 = new LogResource("localhost.txt", "Goodbye, I am an empty message!");
-
-        logs = new ArrayList() {
-            {
-                add(line1);
-                add(line2);
-                add(line3);
-                add(line4);
-            }
-        };
-    }
+    private final List<LogResource> logs = Arrays.asList(
+            new LogResource("catalina.out", "Hello, I am a log stackstrace!"),
+            new LogResource("catalina.out", "Goodbye, I am an another message!"),
+            new LogResource("localhost.txt", "Goodbye, I am an wrong message!"),
+            new LogResource("localhost.txt", "Goodbye, I am an empty message!"));
 
     @Test
     public void testFilterSource() {

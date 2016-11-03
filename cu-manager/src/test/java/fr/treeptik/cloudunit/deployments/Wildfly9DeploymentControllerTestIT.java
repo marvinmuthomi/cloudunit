@@ -3,10 +3,10 @@ package fr.treeptik.cloudunit.deployments;
 /**
  * Created by guillaume on 07/06/16.
  */
-public class Wildfly9DeploymentControllerTestIT extends AbstractJBossDeploymentControllerTestIT {
+public class Wildfly9DeploymentControllerTestIT extends AbstractWildflyDeploymentControllerIT {
 
     public Wildfly9DeploymentControllerTestIT() {
-        super.release = "wildfly-9";
+        super("wildfly-9");
     }
 
 }

@@ -75,6 +75,6 @@ public class Deployment {
     }
     
     public String getUri() {
-        return application.getLocation() + "/" + (contextPath.equals("ROOT") ? "" : contextPath);
+        return application.getLocation() + (contextPath.equals("ROOT") ? "/" : contextPath);
     }
 }

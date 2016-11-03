@@ -20,7 +20,6 @@ import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 import javax.annotation.PostConstruct;
@@ -34,7 +33,6 @@ import org.springframework.cache.annotation.CacheEvict;
 import org.springframework.context.ApplicationEventPublisher;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -42,7 +40,6 @@ import fr.treeptik.cloudunit.config.events.HookEvent;
 import fr.treeptik.cloudunit.config.events.ModuleStartEvent;
 import fr.treeptik.cloudunit.config.events.ModuleStopEvent;
 import fr.treeptik.cloudunit.dao.ModuleDAO;
-import fr.treeptik.cloudunit.dao.PortDAO;
 import fr.treeptik.cloudunit.dto.Hook;
 import fr.treeptik.cloudunit.enums.ModuleEnvironmentRole;
 import fr.treeptik.cloudunit.enums.RemoteExecAction;
@@ -71,9 +68,6 @@ public class ModuleServiceImpl implements ModuleService {
 
     @Inject
     private ModuleDAO moduleDAO;
-
-    @Inject
-    private PortDAO portDAO;
 
     @Inject
     private EnvironmentService environmentService;
@@ -143,12 +137,9 @@ public class ModuleServiceImpl implements ModuleService {
         module.setStartDate(new Date());
 
         //initialise module exposable ports
-        final List<Port> ports = new ArrayList<>();
-        final Module m = module;
-        image.getExposedPorts().keySet().stream()
-                .forEach(p -> {
-                    ports.add(new Port(p, image.getExposedPorts().get(p), null, false, m));
-                });
+        final List<Port> ports = image.getExposedPorts().entrySet().stream()
+                .map(kv -> new Port(kv.getKey(), kv.getValue(), null, false))
+                .collect(Collectors.toList());
         module.setPorts(ports);
 
         // Build a custom container
@@ -242,35 +233,32 @@ public class ModuleServiceImpl implements ModuleService {
     @Override
     @Transactional(rollbackFor = ServiceException.class)
     @CacheEvict("env")
-    public Module publishPort(Integer id, Boolean publishPort, String port, User user) throws ServiceException, CheckException {
-        Module module = findById(id);
-        Optional<Port> optionalPort = module.getPorts().stream()
-                .filter(p -> p.getContainerValue().equals(port)).findAny();
-        if (optionalPort.isPresent()) {
-            Port portToBind = optionalPort.get();
-            portToBind.setOpened(publishPort);
-            portDAO.save(portToBind);
-        }
-        module = findById(id);
-        if (module == null) {
-            throw new CheckException("Module not found");
-        }
+    public Port publishPort(Module module, String portNumber, boolean open, User user)
+            throws ServiceException, CheckException {
+        Port port = module.getPorts().stream()
+                .filter(p -> p.getContainerValue().equals(portNumber))
+                .findAny()
+                .orElseThrow(() -> new CheckException(String.format("No such port %s in module %s",
+                        portNumber,
+                        module.getName())));
+        port.setOpen(open);
+        
         List<String> envs = environmentService.loadEnvironnmentsByContainer(module.getName()).stream()
                 .map(e -> e.getKeyEnv() + "=" + e.getValueEnv()).collect(Collectors.toList());
         dockerService.removeContainer(module.getName(), false);
         dockerService.createModule(module.getName(), module, module.getImage().getPath(), user, envs, false,
                 new ArrayList<>());
-        module = dockerService.startModule(module.getName(), module);
-        module = moduleDAO.save(module);
+        dockerService.startModule(module.getName(), module);
+        moduleDAO.save(module);
         applicationEventPublisher.publishEvent(new ModuleStartEvent(module));
 
-        return module;
+        return port;
     }
 
     public void checkImageExist(String moduleName) throws ServiceException {
         Image image = imageService.findByName(moduleName);
         if (image == null) {
-            throw new ServiceException("Error : the module " + moduleName + " is not available");
+            throw new CheckException("No such module " + moduleName);
         }
 
     }
@@ -440,10 +428,8 @@ public class ModuleServiceImpl implements ModuleService {
     }
     
     @Override
-    public String runScript(String moduleName, MultipartFile file) throws ServiceException {
+    public String runScript(Module module, MultipartFile file) throws ServiceException {
         try {
-            Module module = findByName(moduleName);
-            
             String filename = file.getOriginalFilename();
             String containerId = module.getContainerID();
             String tempDirectory = dockerService.getEnv(containerId, "CU_TMP");

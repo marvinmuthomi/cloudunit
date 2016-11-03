@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly10ActiveMQ5132ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly10ActiveMQ5132ModuleControllerTestIT() {
-        super.server = "wildfly-10";
-        super.module = "activemq-5.13.2";
+        super.serverType = "wildfly-10";
+        super.moduleName = "activemq-5.13.2";
         super.numberPort = "61616";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Wildfly10ActiveMQ5132ModuleControllerTestIT extends AbstractModuleC
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckBrokerConnection().invoke(forwardedPort, "ACTIVEMQ_ADMIN_LOGIN",
                 "ACTIVEMQ_ADMIN_PASSWORD", "ACTIVEMQ_NAME", "JMS");
     }

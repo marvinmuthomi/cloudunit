@@ -15,20 +15,25 @@
 
 package fr.treeptik.cloudunit.explorer;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import fr.treeptik.cloudunit.dto.FileRequestBody;
-import fr.treeptik.cloudunit.exception.FatalDockerJSONException;
-import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
-import fr.treeptik.cloudunit.model.User;
-import fr.treeptik.cloudunit.service.DockerService;
-import fr.treeptik.cloudunit.service.UserService;
-import org.junit.*;
+import static org.hamcrest.CoreMatchers.*;
+import static org.junit.Assert.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.io.File;
+import java.io.FileInputStream;
+import java.util.Random;
+
+import javax.inject.Inject;
+import javax.servlet.Filter;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockMultipartFile;
@@ -49,17 +54,15 @@ import org.springframework.test.web.servlet.request.MockMvcRequestBuilders;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import javax.inject.Inject;
-import javax.servlet.Filter;
-import java.io.File;
-import java.io.FileInputStream;
-import java.util.Random;
+import com.fasterxml.jackson.databind.ObjectMapper;
 
-import static fr.treeptik.cloudunit.utils.TestUtils.downloadAndPrepareFileToDeploy;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.FileRequestBody;
+import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
+import fr.treeptik.cloudunit.model.User;
+import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.ApplicationTemplate;
 
 /**
  * Created by nicolas on 08/09/15.
@@ -73,39 +76,40 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ActiveProfiles("integration")
 public class FileControllerTestIT {
 
-    protected String release = "tomcat-8";
+    protected String serverType = "tomcat-8";
 
     private final Logger logger = LoggerFactory.getLogger(FileControllerTestIT.class);
 
-    @Autowired
+    @Inject
     private WebApplicationContext context;
-
-    private MockMvc mockMvc;
 
     @Inject
     private AuthenticationManager authenticationManager;
 
-    @Autowired
+    @Inject
     private Filter springSecurityFilterChain;
 
     @Inject
     private UserService userService;
 
-    @Inject
-    private DockerService dockerService;
+    private MockMvc mockMvc;
 
     private MockHttpSession session;
+    
+    private ApplicationTemplate applicationTemplate;
 
-    private static String applicationName;
+    private String applicationName;
+    private ApplicationResource application;
 
-    @BeforeClass
-    public static void initEnv() {
-        applicationName = "app" + new Random().nextInt(1000000);
+    private String getContainerName() {
+        return String.format("int-johndoe-%s-%s", applicationName, serverType);
     }
-
+    
     @Before
-    public void setup() {
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
+    public void setUp() throws Exception {
+        applicationName = "app" + new Random().nextInt(10000);
+        
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
         User user = null;
         try {
             user = userService.findByLogin("johndoe");
@@ -119,84 +123,72 @@ public class FileControllerTestIT {
         securityContext.setAuthentication(result);
         session = new MockHttpSession();
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        
+        applicationTemplate = new ApplicationTemplate(mockMvc, session);
+        
+        application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
     }
 
     @After
-    public void teardown() throws Exception {
+    public void tearDown() throws Exception {
+        applicationTemplate.removeApplication(application);
+        
         SecurityContextHolder.clearContext();
         session.invalidate();
     }
 
     @Test
     public void test_listFiles() throws Exception {
-        createApplication();
         ResultActions resultActions = listFiles("/opt/cloudunit");
         String contentAsString = resultActions.andReturn().getResponse().getContentAsString();
-        Assert.assertTrue(contentAsString.contains("beats-agents"));
-        deleteApplication();
+        assertThat(contentAsString, containsString("beats-agents"));
     }
 
 
     @Test
     public void test_uploadFile() throws Exception {
-        createApplication();
-        File local = new File(".");
-        File fileArchive = new File(local.getAbsolutePath()
-                +"/src/test/java/fr/treeptik/cloudunit/explorer/archive.zip");
+        File fileArchive = new File("src/test/java/fr/treeptik/cloudunit/explorer/archive.zip");
         ResultActions resultActions = upload(fileArchive, "/opt/cloudunit/");
         resultActions.andExpect(status().isOk());
         resultActions = listFiles("/opt/cloudunit/");
         resultActions.andExpect(status().isOk());
         String contentAsString = resultActions.andReturn().getResponse().getContentAsString();
-        Assert.assertTrue(contentAsString.contains("archive.zip"));
-        deleteApplication();
+        assertThat(contentAsString, containsString("archive.zip"));
     }
 
     @Test
     public void test_unzipFile() throws Exception {
-        createApplication();
-        File local = new File(".");
-        File fileArchive = new File(local.getAbsolutePath()
-                +"/src/test/java/fr/treeptik/cloudunit/explorer/archive.zip");
+        File fileArchive = new File("src/test/java/fr/treeptik/cloudunit/explorer/archive.zip");
         ResultActions resultActions = upload(fileArchive, "/opt/cloudunit/");
         resultActions.andExpect(status().isOk());
 
-        String containerId = "int-johndoe-"+applicationName+"-tomcat-8";
-        String url = "/file/unzip/container/"+containerId+"/application/"+applicationName
-                +"?path=/opt/cloudunit&fileName=archive.zip";
-        resultActions = this.mockMvc
-                .perform(
-                        put(url).contentType(MediaType.APPLICATION_JSON)
-                                .session(session));
+        String url = String.format("/file/unzip/container/%s/application/%s?path=/opt/cloudunit&fileName=archive.zip",
+                getContainerName(),
+                applicationName);
+        resultActions = mockMvc.perform(put(url).session(session));
         resultActions.andExpect(status().isOk());
 
         resultActions = listFiles("/opt/cloudunit/");
         String contentAsString = resultActions.andReturn().getResponse().getContentAsString();
-        Assert.assertTrue(contentAsString.contains("CLI-GUIDE.md"));
-        deleteApplication();
+        assertThat(contentAsString, containsString("CLI-GUIDE.md"));
     }
 
     @Test
     public void test_displayContentFileFromContainer() throws Exception {
-        createApplication();
         ResultActions resultActions = getContentAsString("/opt/cloudunit/tomcat/conf", "context.xml");
         resultActions.andExpect(status().isOk());
         String contentAsString = resultActions.andReturn().getResponse().getContentAsString();
-        Assert.assertTrue("File contains keyword 'Context'", contentAsString.contains("Context"));
-        deleteApplication();
+        assertThat(contentAsString, containsString("Context"));
     }
 
     @Test
     public void test_to_gather_an_wrong_file() throws Exception {
-        createApplication();
         ResultActions resultActions = getContentAsString("/opt/cloudunit/tomcat/conf", "undef.xml");
         resultActions.andExpect(status().is5xxServerError());
-        deleteApplication();
     }
 
     @Test
     public void test_saveContentFileIntoContainer() throws Exception {
-        createApplication();
         String keyWord = "HelloWorld";
         String remotePath = "/opt/cloudunit/tomcat/conf";
         String remoteFile = "context.xml";
@@ -204,46 +196,32 @@ public class FileControllerTestIT {
         ResultActions resultActions = getContentAsString(remotePath, remoteFile);
         resultActions.andExpect(status().isOk());
         String contentAsString = resultActions.andReturn().getResponse().getContentAsString();
-        Assert.assertTrue(contentAsString.contains(keyWord));
-        deleteApplication();
+        
+        assertThat(contentAsString, containsString(keyWord));
     }
 
     private void saveContentIntoRemoteFile(String fileName, String path, String content) throws Exception {
-        String containerId = "int-johndoe-"+applicationName+"-tomcat-8";
         FileRequestBody body = new FileRequestBody();
         body.setFileName(fileName);
         body.setFilePath(path);
         body.setFileContent(content);
         ObjectMapper objectMapper = new ObjectMapper();
         String jsonString = objectMapper.writeValueAsString(body);
-        String url = "/file/content/container/"+containerId+"/application/"+applicationName;
-        ResultActions resultats = this.mockMvc
-                .perform(
-                        put(url)
-                                .content(jsonString).contentType(MediaType.APPLICATION_JSON)
+        String url = String.format("/file/content/container/%s/application/%s",
+                getContainerName(),
+                applicationName);
+        ResultActions resultats = mockMvc.perform(put(url)
+                                .content(jsonString)
+                                .contentType(MediaType.APPLICATION_JSON)
                                 .session(session));
         resultats.andExpect(status().isOk());
     }
 
-    private void createApplication() throws Exception {
-        logger.info("Create Tomcat server");
-        final String jsonString =
-                "{\"applicationName\":\"" + applicationName + "\", \"serverName\":\"" + release + "\"}";
-        ResultActions resultats =
-                mockMvc.perform(post("/application").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().isOk());
-    }
-
-    private void deleteApplication() throws Exception {
-        logger.info("Delete application : " + applicationName);
-        ResultActions resultats =
-                mockMvc.perform(delete("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON));
-        resultats.andExpect(status().isOk());
-    }
-
     private ResultActions upload(File localFile, String remotePath) throws Exception {
-        String container = "int-johndoe-"+applicationName+"-tomcat-8";
-        String url = "/file/container/"+container+"/application/"+applicationName+"?path="+remotePath;
+        String url = String.format("/file/container/%s/application/%s?path=%s",
+                getContainerName(),
+                applicationName,
+                remotePath);
         MockMultipartFile mockMultipartFile = new MockMultipartFile("file", localFile.getName(),
                 "multipart/form-data", new FileInputStream(localFile));
         return mockMvc.perform(MockMvcRequestBuilders.fileUpload(url)
@@ -253,25 +231,21 @@ public class FileControllerTestIT {
     }
 
     private ResultActions getContentAsString(String remotePath, String remoteFileName) throws Exception {
-        String container = "int-johndoe-"+applicationName+"-tomcat-8";
-        String url = "/file/content/container/"+container+"/application/"+applicationName
-                +"?path="+remotePath
-                +"&fileName="+remoteFileName;
+        String url = String.format("/file/content/container/%s/application/%s?path=%s&fileName=%s",
+                getContainerName(),
+                applicationName,
+                remotePath,
+                remoteFileName);
         logger.debug(url);
-        ResultActions resultats = this.mockMvc
-                .perform(
-                        get(url)
-                                .session(session));
+        ResultActions resultats = mockMvc.perform(get(url).session(session));
         return resultats;
     }
 
     private ResultActions listFiles(String remotePath) throws Exception {
-        String container = "int-johndoe-"+applicationName+"-tomcat-8";
-        String url = "/file/container/"+container+"?path="+remotePath;
-        ResultActions resultats = this.mockMvc
-                .perform(
-                        get(url)
-                                .session(session));
+        String url = String.format("/file/container/%s?path=%s",
+                getContainerName(),
+                remotePath);
+        ResultActions resultats = mockMvc.perform(get(url).session(session));
         return resultats;
     }
 

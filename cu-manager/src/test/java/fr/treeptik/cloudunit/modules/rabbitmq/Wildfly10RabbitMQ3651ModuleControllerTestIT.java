@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly10RabbitMQ3651ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly10RabbitMQ3651ModuleControllerTestIT() {
-        super.server = "wildfly-10";
-        super.module = "rabbitmq-3.6.5-1";
+        super.serverType = "wildfly-10";
+        super.moduleName = "rabbitmq-3.6.5-1";
         super.numberPort = "5672";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Wildfly10RabbitMQ3651ModuleControllerTestIT extends AbstractModuleC
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckBrokerConnection().invoke(forwardedPort, "RABBITMQ_DEFAULT_USER",
                 "RABBITMQ_DEFAULT_PASS", "RABBITMQ_DEFAULT_VHOST", "AMQP");
     }

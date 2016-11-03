@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Wildfly8Mongo26ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Wildfly8Mongo26ModuleControllerTestIT() {
-        super.server = "wildfly-8";
-        super.module = "mongo-2-6";
+        super.serverType = "wildfly-8";
+        super.moduleName = "mongo-2-6";
         super.numberPort = "27017";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Wildfly8Mongo26ModuleControllerTestIT extends AbstractModuleControl
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
             new CheckMongoConnection().invoke(forwardedPort);
     }
 }

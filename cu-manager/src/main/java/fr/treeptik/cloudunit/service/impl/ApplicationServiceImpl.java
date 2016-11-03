@@ -15,7 +15,6 @@
 
 package fr.treeptik.cloudunit.service.impl;
 
-import java.nio.file.Paths;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
@@ -267,7 +266,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 		application.setStatus(Status.PENDING);
 		application = this.saveInDB(application);
 
-		String subdomain = System.getenv("CU_SUB_DOMAIN") == null ? "" : System.getenv("CU_SUB_DOMAIN");
 		List<Image> imagesEnabled = imageService.findEnabledImages();
 		List<String> imageNames = new ArrayList<>();
 		for (Image image : imagesEnabled) {
@@ -280,7 +278,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 
 		try {
 			// BLOC APPLICATION
-			application.setDomainName(subdomain + suffixCloudUnitIO);
+			application.setDomainName(suffixCloudUnitIO);
 			application = applicationDAO.save(application);
 			application.setManagerIp(dockerManagerIp);
 
@@ -295,8 +293,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 			server.setName(serverName);
 			server = serverService.create(server, tagName);
 
-			List<Server> servers = new ArrayList<>();
-			servers.add(server);
 			application.setServer(server);
 
 			// Persistence for Application model
@@ -528,18 +524,6 @@ public class ApplicationServiceImpl implements ApplicationService {
 			logger.info ("Deploy command {}", result);
 			Deployment deployment = deploymentService.create(application, DeploymentType.from(filename), contextPath);
 			application.addDeployment(deployment);
-
-			// If application is anything else than .jar or ROOT.war
-			// we need to clean for the next deployment.
-			if (!"/".equalsIgnoreCase(contextPath)) {
-				@SuppressWarnings("serial")
-				HashMap<String, String> kvStore2 = new HashMap<String, String>() {
-					{
-						put("CU_TARGET", Paths.get(tempDirectory, filename).toString());
-					}
-				};
-				dockerService.execCommand(containerId, RemoteExecAction.CLEAN_DEPLOY.getCommand(kvStore2));
-			}
 			
 			return deployment;
 		} catch (Exception e) {

@@ -27,6 +27,7 @@ import org.aspectj.lang.annotation.Aspect;
 import org.aspectj.lang.annotation.Before;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.stereotype.Component;
@@ -40,7 +41,6 @@ import javax.inject.Inject;
 @Component
 @Aspect
 public class SecurityAnnotationAspect {
-
     private final Logger logger = LoggerFactory.getLogger(SecurityAnnotationAspect.class);
 
     @Inject
@@ -50,31 +50,49 @@ public class SecurityAnnotationAspect {
     private ApplicationService applicationService;
 
     @Before("@annotation(fr.treeptik.cloudunit.aspects.CloudUnitSecurable) && args(applicationName)")
-    public void verifyRelationBetweenUserAndApplication(JoinPoint joinPoint, String applicationName) {
+    public void verifyRelationBetweenUserAndApplicationName(JoinPoint joinPoint, String applicationName) {
 
         UserDetails principal = null;
-        JsonInput jsonInput = null;
         try {
             principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
             User user = userService.findByLogin(principal.getUsername());
 
-            if (joinPoint.getArgs() == null) {
-                logger.error("Error on annotation aspect : " + joinPoint.getStaticPart().getSignature());
-            } else {
-                if (joinPoint.getArgs()[0] instanceof JsonInput) {
-                    jsonInput = (JsonInput) joinPoint.getArgs()[0];
-                    applicationName = jsonInput.getApplicationName();
-                }
-                Application application = applicationService.findByNameAndUser(user, applicationName);
-                if (application == null) {
-                    throw new IllegalArgumentException("This application does not exist on this account : " + applicationName + "," + user);
-                }
+            Application application = applicationService.findByNameAndUser(user, applicationName);
+            if (application == null) {
+                throw new AccessDeniedException("This application does not exist on this account : " + applicationName + "," + user);
             }
-
         } catch (ServiceException | CheckException e) {
-            logger.error(principal.toString() + ", " + jsonInput, e);
+            logger.error(principal.toString() + ", " + applicationName, e);
         }
 
+    }
+    
+    @Before("@annotation(fr.treeptik.cloudunit.aspects.CloudUnitSecurable) && args(input)")
+    public void verifyRelationBetweenUserAndApplicationName(JoinPoint joinPoint, JsonInput input) {
+        String applicationName = input.getApplicationName();
+        verifyRelationBetweenUserAndApplicationName(joinPoint, applicationName);
+    }
+
+
+    @Before("@annotation(fr.treeptik.cloudunit.aspects.CloudUnitSecurable) && args(applicationId,..)")
+    public void verifyRelationBetweenUserAndApplicationId(JoinPoint joinPoint, Integer applicationId) {
+        UserDetails principal = null;
+        try {
+            principal = (UserDetails) SecurityContextHolder.getContext().getAuthentication().getPrincipal();
+            User user = userService.findByLogin(principal.getUsername());
+
+            Application application = applicationService.findById(applicationId);
+            
+            if (application == null) {
+                return;
+            }
+            
+            if (!application.getUser().equals(user)) {
+                throw new AccessDeniedException("You are not authorized to access this application");
+            }
+        } catch (ServiceException | CheckException e) {
+            logger.error(principal.toString() + ", " + applicationId, e);
+        }
     }
 
 }

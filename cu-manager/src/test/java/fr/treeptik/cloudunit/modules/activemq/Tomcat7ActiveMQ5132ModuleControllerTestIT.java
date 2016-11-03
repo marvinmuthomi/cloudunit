@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Tomcat7ActiveMQ5132ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Tomcat7ActiveMQ5132ModuleControllerTestIT() {
-        super.server = "tomcat-7";
-        super.module = "activemq-5.13.2";
+        super.serverType = "tomcat-7";
+        super.moduleName = "activemq-5.13.2";
         super.numberPort = "61616";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Tomcat7ActiveMQ5132ModuleControllerTestIT extends AbstractModuleCon
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckBrokerConnection().invoke(forwardedPort, "ACTIVEMQ_ADMIN_LOGIN",
                 "ACTIVEMQ_ADMIN_PASSWORD", "ACTIVEMQ_NAME", "JMS");
     }

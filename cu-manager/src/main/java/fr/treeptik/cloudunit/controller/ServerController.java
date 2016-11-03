@@ -81,10 +81,14 @@ public class ServerController {
 	    ServerResource resource = new ServerResource(server);
 	    
 	    try {
-            resource.add(linkTo(methodOn(ServerController.class).getServer(application.getId()))
+            Integer applicationId = application.getId();
+            resource.add(linkTo(methodOn(ServerController.class).getServer(applicationId))
                     .withSelfRel());
             
-            resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
+            resource.add(linkTo(methodOn(ContainerController.class).getContainer(applicationId, server.getName()))
+                    .withRel("container"));
+            
+            resource.add(linkTo(methodOn(ApplicationController.class).detail(applicationId))
                     .withRel("application"));
         } catch (CheckException | ServiceException e) {
             //ignore
@@ -93,6 +97,7 @@ public class ServerController {
 	    return resource;
 	}
 	
+	@CloudUnitSecurable
 	@RequestMapping(method = RequestMethod.GET)
 	public ResponseEntity<?> getServer(@PathVariable Integer applicationId) throws CheckException, ServiceException {
 	    Application application = applicationService.findById(applicationId);
@@ -105,6 +110,7 @@ public class ServerController {
 	    return ResponseEntity.ok(resource);
 	}
 	
+	@CloudUnitSecurable
     @RequestMapping(method = RequestMethod.PATCH)
     public ResponseEntity<?> patchServer(
             @PathVariable Integer applicationId,
@@ -138,6 +144,7 @@ public class ServerController {
         return ResponseEntity.ok(resource);
     }
 
+	@CloudUnitSecurable
     @RequestMapping(method = RequestMethod.PUT)
     public ResponseEntity<?> putServer(
             @PathVariable Integer applicationId,

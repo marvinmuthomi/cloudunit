@@ -15,6 +15,11 @@
 
 package fr.treeptik.cloudunit.utils;
 
+import java.io.IOException;
+import java.net.URL;
+import java.util.Optional;
+import java.util.stream.Stream;
+
 import org.apache.http.HttpEntity;
 import org.apache.http.HttpResponse;
 import org.apache.http.ParseException;
@@ -22,28 +27,17 @@ import org.apache.http.client.methods.HttpGet;
 import org.apache.http.impl.client.CloseableHttpClient;
 import org.apache.http.impl.client.HttpClients;
 import org.apache.http.util.EntityUtils;
-import org.slf4j.Logger;
-import org.slf4j.LoggerFactory;
 import org.springframework.mock.web.MockMultipartFile;
-
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.FileOutputStream;
-import java.io.IOException;
-import java.io.InputStream;
-import java.io.OutputStream;
-import java.net.URL;
 
 /**
  * Class with utilities method for testing url and application deployment
  */
 public class TestUtils {
-
-    private static final Logger logger = LoggerFactory.getLogger(TestUtils.class);
-
     /**
-     * Number of maximum iteration to test the content page.
-     * Raise the value if some tests are not fonctional.
+     * Maximum number of iterations when pooling for content.
+     * Raise the value if some tests fail.
+     * 
+     * @see #waitForContent(String)
      */
     public static final Integer NB_ITERATION_MAX = 30;
 
@@ -63,6 +57,29 @@ public class TestUtils {
         HttpEntity entity = response.getEntity();
         return EntityUtils.toString(entity);
     }
+    
+    /**
+     * Pool URL until non-error content is given.
+     * 
+     * Tries at most {@link #NB_ITERATION_MAX} times.
+     * 
+     * @param url  a string containing a valid URL
+     * @return the content received, or {@link Optional#empty()} if the URL has been pooled the maximum amount of times
+     * before any content was returned.  
+     */
+    public static Optional<String> waitForContent(String url) {
+        return Stream.generate(() -> {
+                    try {
+                        Thread.sleep(1000);
+                        return getUrlContentPage(url);
+                    } catch (ParseException | IOException | InterruptedException e) {
+                        return null;
+                    }
+                })
+            .limit(NB_ITERATION_MAX)
+            .filter(content -> content != null && !content.contains("404") && !content.contains("502"))
+            .findFirst();
+    }
 
     /**
      * Download from github binaries and deploy file.
@@ -71,28 +88,8 @@ public class TestUtils {
      * @return
      * @throws IOException
      */
-    public static MockMultipartFile downloadAndPrepareFileToDeploy(String remoteFile, String path)
-        throws IOException {
-        URL url;
-        File file = new File(remoteFile);
-        try (OutputStream outputStream = new FileOutputStream(file)) {
-            url = new URL(path);
-            InputStream input = url.openStream();
-
-            int read;
-            byte[] bytes = new byte[1024];
-
-            while ((read = input.read(bytes)) != -1) {
-                outputStream.write(bytes, 0, read);
-            }
-        } catch (IOException e) {
-            StringBuilder msgError = new StringBuilder(512);
-            msgError.append(remoteFile);
-            msgError.append(",");
-            msgError.append(path);
-            logger.debug(msgError.toString(), e);
-        }
-        return new MockMultipartFile("file", file.getName(), "multipart/form-data", new FileInputStream(file));
-
+    public static MockMultipartFile downloadAndPrepareFileToDeploy(String filename, String path)
+            throws IOException {
+        return new MockMultipartFile("file", filename, "multipart/form-data", new URL(path).openStream());
     }
 }

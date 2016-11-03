@@ -148,7 +148,7 @@ public abstract class AbstractApplicationControllerTestIT {
         
         assertEquals(expectedName, application.getName());
         
-        applicationTemplate.deleteApplication(application);
+        applicationTemplate.removeApplication(application);
     }
 
     @Test()
@@ -163,7 +163,7 @@ public abstract class AbstractApplicationControllerTestIT {
         applicationTemplate.startApplication(application)
             .andExpect(status().isNoContent());
 
-        applicationTemplate.deleteApplication(application)
+        applicationTemplate.removeApplication(application)
             .andExpect(status().isNoContent());
     }
 
@@ -180,7 +180,7 @@ public abstract class AbstractApplicationControllerTestIT {
     
             assertEquals(server.getJvmMemory().longValue(), 1024L);
         } finally {
-            applicationTemplate.deleteApplication(application);
+            applicationTemplate.removeApplication(application);
         }
     }
 
@@ -193,7 +193,7 @@ public abstract class AbstractApplicationControllerTestIT {
             ResultActions result = applicationTemplate.setJvmMemory(server, 666L);
             result.andExpect(status().isBadRequest());
         } finally {
-            applicationTemplate.deleteApplication(application);
+            applicationTemplate.removeApplication(application);
         }
     }
     
@@ -208,7 +208,7 @@ public abstract class AbstractApplicationControllerTestIT {
             ResultActions result = applicationTemplate.setServer(server);
             result.andExpect(status().isBadRequest());            
         } finally {
-            applicationTemplate.deleteApplication(application);
+            applicationTemplate.removeApplication(application);
         }
     }
 
@@ -224,8 +224,8 @@ public abstract class AbstractApplicationControllerTestIT {
             
             assertEquals(server.getJvmOptions(), "-Dkey1=value1");
         } finally {
-            applicationTemplate.deleteApplication(application);
-        }        
+            applicationTemplate.removeApplication(application);
+        }
     }
 
     @Test(timeout = 30000)
@@ -237,7 +237,7 @@ public abstract class AbstractApplicationControllerTestIT {
             ResultActions result = applicationTemplate.setJvmOptions(server, "-Xms=512m");
             result.andExpect(status().isBadRequest());
         } finally {
-            applicationTemplate.deleteApplication(application);
+            applicationTemplate.removeApplication(application);
         }
     }
 
@@ -266,7 +266,7 @@ public abstract class AbstractApplicationControllerTestIT {
                     this.mockMvc.perform(post("/server/ports/close").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
             resultats.andExpect(status().isOk());
         } finally {
-            applicationTemplate.deleteApplication(application);
+            applicationTemplate.removeApplication(application);
         }
     }
 

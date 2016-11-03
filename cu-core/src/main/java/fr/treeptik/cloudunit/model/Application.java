@@ -366,6 +366,14 @@ public class Application implements Serializable {
 
 		return this.portsToOpen;
 	}
+	
+	public Set<Container> getContainers() {
+	    Set<Container> containers = new HashSet<>(modules);
+	    
+	    containers.add(server);
+	    
+	    return containers;
+	}
 
     public Deployment addDeployment(String contextPath, DeploymentType type) {
         Deployment deployment = new Deployment(this, contextPath, type);

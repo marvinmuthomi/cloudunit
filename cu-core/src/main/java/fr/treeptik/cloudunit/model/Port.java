@@ -1,16 +1,22 @@
 package fr.treeptik.cloudunit.model;
 
-import com.fasterxml.jackson.annotation.JsonIgnore;
-import fr.treeptik.cloudunit.enums.PortType;
-
-import javax.persistence.*;
 import java.io.Serializable;
+
+import javax.persistence.Entity;
+import javax.persistence.EnumType;
+import javax.persistence.Enumerated;
+import javax.persistence.GeneratedValue;
+import javax.persistence.GenerationType;
+import javax.persistence.Id;
+
+import fr.treeptik.cloudunit.enums.PortType;
 
 /**
  * Created by guillaume on 25/09/16.
  */
 @Entity
 public class Port implements Serializable {
+    private static final long serialVersionUID = 1L;
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -23,21 +29,15 @@ public class Port implements Serializable {
 
     private String containerValue;
 
-    private Boolean opened;
+    private boolean open;
 
-    @ManyToOne
-    @JsonIgnore
-    private Module module;
+    public Port() {}
 
-    public Port() {
-    }
-
-    public Port(PortType portType, String containerValue, String hostValue, Boolean opened, Module module) {
+    public Port(PortType portType, String containerValue, String hostValue, boolean open) {
         this.portType = portType;
         this.hostValue = hostValue;
         this.containerValue = containerValue;
-        this.opened = opened;
-        this.module = module;
+        this.open = open;
     }
 
     public Integer getId() {
@@ -47,7 +47,6 @@ public class Port implements Serializable {
     public void setId(Integer id) {
         this.id = id;
     }
-
 
     public PortType getPortType() {
         return portType;
@@ -73,19 +72,11 @@ public class Port implements Serializable {
         this.containerValue = containerValue;
     }
 
-    public Boolean getOpened() {
-        return opened;
+    public boolean isOpen() {
+        return open;
     }
 
-    public void setOpened(Boolean opened) {
-        this.opened = opened;
-    }
-
-    public Module getModule() {
-        return module;
-    }
-
-    public void setModule(Module module) {
-        this.module = module;
+    public void setOpen(boolean open) {
+        this.open = open;
     }
 }

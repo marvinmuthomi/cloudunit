@@ -30,23 +30,23 @@
 
 package fr.treeptik.cloudunit.ports;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import fr.treeptik.cloudunit.dto.PortResource;
-import fr.treeptik.cloudunit.dto.VolumeResource;
-import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
-import fr.treeptik.cloudunit.model.User;
-import fr.treeptik.cloudunit.service.UserService;
-import org.junit.*;
+import static org.hamcrest.Matchers.*;
+import static org.junit.Assert.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.util.Random;
+
+import javax.inject.Inject;
+import javax.servlet.Filter;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
+import org.springframework.hateoas.Link;
+import org.springframework.hateoas.Resources;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -64,14 +64,13 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import javax.inject.Inject;
-import javax.servlet.Filter;
-import java.util.Random;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.PortResource;
+import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
+import fr.treeptik.cloudunit.model.User;
+import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.ApplicationTemplate;
 
 
 /**
@@ -85,48 +84,39 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 })
 @ActiveProfiles("integration")
 public class PortsControllerTestIT {
-
-    protected String release = "tomcat-8";
-
+    private static final int PORT_NUMBER = 6115;
+    
     private final Logger logger = LoggerFactory.getLogger(PortsControllerTestIT.class);
 
-    @Autowired
-    private WebApplicationContext context;
+    private final String serverType = "tomcat-8";
 
-    private MockMvc mockMvc;
+    @Inject
+    private WebApplicationContext context;
 
     @Inject
     private AuthenticationManager authenticationManager;
 
-    @Autowired
+    @Inject
     private Filter springSecurityFilterChain;
 
     @Inject
     private UserService userService;
 
+    private MockMvc mockMvc;
+
     private MockHttpSession session;
+    
+    private ApplicationTemplate applicationTemplate;
 
-    private ObjectMapper mapper = new ObjectMapper();
+    private String applicationName;
 
-    private static String applicationName;
-
-    @BeforeClass
-    public static void initEnv() {
-        applicationName = "App" + new Random().nextInt(1000);
-    }
-
-    @After
-    public void teardown() throws Exception {
-        logger.info("teardown");
-        SecurityContextHolder.clearContext();
-        session.invalidate();
-    }
+    private ApplicationResource application;
 
     @Before
-    public void setup() {
-        logger.info("setup");
-
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
+    public void setUp() throws Exception {
+        applicationName = "App" + new Random().nextInt(10000);
+        
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 
         User user = null;
         try {
@@ -141,145 +131,70 @@ public class PortsControllerTestIT {
         securityContext.setAuthentication(result);
         session = new MockHttpSession();
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        
+        applicationTemplate = new ApplicationTemplate(mockMvc, session);
+
+        application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
+    }
+
+    @After
+    public void tearDown() throws Exception {
+        applicationTemplate.removeApplication(application);
+
+        SecurityContextHolder.clearContext();
+        session.invalidate();
     }
 
     @Test
-    public void test_openAndClosePort() throws Exception {
-        createApplication();
+    public void test_okOpenAndClosePort() throws Exception {
+        // Add port
+        ResultActions result = applicationTemplate.openPort(application, PORT_NUMBER, "web");
+        result.andExpect(status().isCreated());
+        PortResource port = applicationTemplate.getPort(result);
 
-        logger.info("Open custom ports !");
+        Resources<PortResource> ports = applicationTemplate.getPorts(application);
 
+        assertThat(ports.getContent(), contains(hasProperty("number", equalTo(PORT_NUMBER))));
+        
+        // Remove port
+        result = applicationTemplate.closePort(port);
+        result.andExpect(status().isNoContent());
+
+        ports = applicationTemplate.getPorts(application);
+
+        assertThat(ports.getContent(), empty());
+    }
+
+    @Test
+    public void test_koAddPortNegativeNumber() throws Exception {
+        applicationTemplate.openPort(application, -1, "web")
+            .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    public void test_koAddPortZeroNumber() throws Exception {
+        applicationTemplate.openPort(application, 0, "web")
+            .andExpect(status().isBadRequest());
+    }
+    
+    @Test
+    public void test_koAddPortNoNumber() throws Exception {
+        applicationTemplate.openPort(application, null, "web")
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void test_koAddPortUnknownNature() throws Exception {
+        applicationTemplate.openPort(application, PORT_NUMBER, "dzqmok")
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
+    public void test_koClosePortUnknown() throws Exception {
         PortResource port = new PortResource();
-        port.setPortToOpen("6115");
-        port.setAlias("access6115");
-        port.setPortNature("web");
-        port.setApplicationName(applicationName);
-        String jsonString = getString(port, mapper);
-
-        ResultActions resultats = openPort(jsonString);
-        resultats.andExpect(status().isOk()).andDo(print());
-        resultats = getApplication();
-        resultats.andExpect(jsonPath("$.portsToOpen[0].port").value(6115));
-
-        // REMOVE THE PORT
-        resultats = removePort("6115");
-        resultats.andExpect(status().isOk()).andDo(print());
-        resultats.andExpect(jsonPath("$.portsToOpen[0]").doesNotExist());
-
-        deleteApplication();
+        port.add(new Link(application.getId().getHref() + "/ports/" + PORT_NUMBER));
+        
+        applicationTemplate.closePort(port)
+            .andExpect(status().isNotFound());
     }
-
-    private ResultActions getApplication() throws Exception {
-        ResultActions resultats;
-        resultats =
-                mockMvc.perform(get("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON)).andDo(print());
-        return resultats;
-    }
-
-    @Test
-    public void test_addBadPort() throws Exception {
-        logger.info("Add bad port values. FailCase");
-        createApplication();
-
-        PortResource port = new PortResource();
-        port.setPortToOpen("-1");
-        port.setAlias("access6115");
-        port.setPortNature("web");
-        port.setApplicationName(applicationName);
-        String jsonString = getString(port, mapper);
-        ResultActions resultActions = openPort(jsonString);
-        resultActions.andExpect(status().is4xxClientError());
-
-        port = new PortResource();
-        port.setPortToOpen("0");
-        port.setAlias("access6115");
-        port.setPortNature("web");
-        port.setApplicationName(applicationName);
-        jsonString = getString(port, mapper);
-        resultActions = openPort(jsonString);
-        resultActions.andExpect(status().is4xxClientError());
-
-        port = new PortResource();
-        port.setPortToOpen("xxx");
-        port.setAlias("access6115");
-        port.setPortNature("web");
-        port.setApplicationName(applicationName);
-        jsonString = getString(port, mapper);
-        resultActions = openPort(jsonString);
-        resultActions.andExpect(status().is4xxClientError());
-
-        port = new PortResource();
-        port.setAlias("access6115");
-        port.setPortNature("web");
-        port.setApplicationName(applicationName);
-        jsonString = getString(port, mapper);
-        resultActions = openPort(jsonString);
-        resultActions.andExpect(status().is4xxClientError());
-
-        deleteApplication();
-    }
-
-    @Test
-    public void test_addBadNature() throws Exception {
-        logger.info("Add bad nature values. FailCase");
-        createApplication();
-        PortResource port = new PortResource();
-        port.setPortToOpen("6115");
-        port.setAlias("access6115");
-        port.setPortNature("undef");
-        port.setApplicationName(applicationName);
-        String jsonString = getString(port, mapper);
-
-        ResultActions resultActions = openPort(jsonString);
-        resultActions.andExpect(status().is4xxClientError());
-        deleteApplication();
-    }
-
-    @Test
-    public void test21_closeFailPort() throws Exception {
-        createApplication();
-        ResultActions resultActions = removePort("xxx");
-        resultActions.andExpect(status().is4xxClientError());
-        deleteApplication();
-    }
-
-    private void createApplication() throws Exception {
-        logger.info("Create Tomcat server");
-        final String jsonString =
-                "{\"applicationName\":\"" + applicationName + "\", \"serverName\":\"" + release + "\"}";
-        ResultActions resultats =
-                mockMvc.perform(post("/application").session(session).contentType(MediaType.APPLICATION_JSON).content(jsonString));
-        resultats.andExpect(status().isOk());
-    }
-
-    private void deleteApplication() throws Exception {
-        logger.info("Delete application : " + applicationName);
-        ResultActions resultats =
-                mockMvc.perform(delete("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON));
-        resultats.andExpect(status().isOk());
-    }
-
-    private ResultActions openPort(String jsonString) throws Exception {
-        ResultActions resultats =
-                this.mockMvc.perform(post("/application/ports")
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonString));
-        return resultats;
-    }
-
-    private ResultActions removePort(String port) throws Exception {
-        ResultActions resultats =
-                this.mockMvc.perform(delete("/application/" + applicationName + "/ports/"+port)
-                        .session(session)
-                        .contentType(MediaType.APPLICATION_JSON));
-        return resultats;
-    }
-
-    private String getString(PortResource portResource, ObjectMapper mapper) throws JsonProcessingException {
-        mapper.configure(SerializationFeature.WRAP_ROOT_VALUE, false);
-        ObjectWriter ow = mapper.writer().withDefaultPrettyPrinter();
-        return ow.writeValueAsString(portResource);
-    }
-
 }

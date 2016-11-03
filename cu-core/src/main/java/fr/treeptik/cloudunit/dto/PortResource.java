@@ -15,105 +15,64 @@
 
 package fr.treeptik.cloudunit.dto;
 
-import fr.treeptik.cloudunit.exception.CheckException;
-import fr.treeptik.cloudunit.model.PortToOpen;
-import fr.treeptik.cloudunit.utils.CheckUtils;
+import javax.validation.constraints.AssertTrue;
+import javax.validation.constraints.Min;
+import javax.validation.constraints.NotNull;
 
-import java.io.Serializable;
+import org.springframework.hateoas.ResourceSupport;
+
+import com.fasterxml.jackson.annotation.JsonIgnore;
+
+import fr.treeptik.cloudunit.model.PortToOpen;
 
 /**
  * Created by nicolas on 31/07/2014.
  */
-public class PortResource implements Serializable {
+public class PortResource extends ResourceSupport {
+    @Min(1)
+    @NotNull
+	private Integer number;
 
-	private static final long serialVersionUID = 1L;
-
-	private String applicationName;
-
-	private String alias;
-
-	private String portToOpen;
-
-	private String portNature;
+    @NotNull
+	private String nature;
 	
-	private Boolean portQuickAccess;
+	private Boolean quickAccess;
 
-	public PortResource() {
-	}
+	public PortResource() {}
 
 	public PortResource(PortToOpen portToOpen) {
-		this.applicationName = portToOpen.getApplication().getName();
-		this.portNature = portToOpen.getNature();
-		this.portQuickAccess = portToOpen.getQuickAccess();
-		this.portToOpen = String.valueOf(portToOpen.getPort());
-		this.alias = portToOpen.getAlias();
+		this.nature = portToOpen.getNature();
+		this.quickAccess = portToOpen.getQuickAccess();
+		this.number = portToOpen.getPort();
 	}
 
-	public String getApplicationName() {
-		return applicationName;
+	public Integer getNumber() {
+		return number;
 	}
 
-	public void setApplicationName(String applicationName) {
-		this.applicationName = applicationName;
+	public void setNumber(Integer number) {
+		this.number = number;
 	}
 
-	public String getAlias() {
-		return alias;
+	public String getNature() {
+		return nature;
 	}
 
-	public void setAlias(String alias) {
-		this.alias = alias;
-	}
-
-	public String getPortToOpen() {
-		return portToOpen;
-	}
-
-	public void setPortToOpen(String portToOpen) {
-		this.portToOpen = portToOpen;
-	}
-
-	public String getPortNature() {
-		return portNature;
-	}
-
-	public void setPortNature(String portNature) {
-		this.portNature = portNature;
+	public void setNature(String nature) {
+		this.nature = nature;
 	}
 	
-	public Boolean getPortQuickAccess() {
-		return portQuickAccess;
+	public Boolean isQuickAccess() {
+		return quickAccess;
 	}
 
-	public void setPortQuickAccess(Boolean portQuickAccess) {
-		this.portQuickAccess = portQuickAccess;
+	public void setQuickAccess(Boolean quickAccess) {
+		this.quickAccess = quickAccess;
 	}
-
-	public static long getSerialVersionUID() {
-		return serialVersionUID;
-	}
-
-	public void validateStartApp() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
-	}
-
-	public void validateStopApp() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
-	}
-
-	public void validateRemoveApp() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
-	}
-
-	public void validatePublishPort() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
-	}
-
-	public void validateDetail() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
-	}
-
-	public void validateClone() throws CheckException {
-		CheckUtils.validateSyntaxInput(applicationName, "check.app.name");
+		
+	@JsonIgnore
+	@AssertTrue(message = "Port nature must be web")
+	public boolean isValidNature() {
+	    return nature.equals("web");
 	}
 }

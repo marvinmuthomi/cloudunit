@@ -15,21 +15,21 @@
 
 package fr.treeptik.cloudunit.logs;
 
-import com.fasterxml.jackson.core.JsonProcessingException;
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.fasterxml.jackson.databind.ObjectWriter;
-import com.fasterxml.jackson.databind.SerializationFeature;
-import fr.treeptik.cloudunit.dto.VolumeResource;
-import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
-import fr.treeptik.cloudunit.model.User;
-import fr.treeptik.cloudunit.service.UserService;
-import org.junit.*;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.util.Random;
+
+import javax.inject.Inject;
+import javax.servlet.Filter;
+
+import org.junit.After;
+import org.junit.Assert;
+import org.junit.Before;
+import org.junit.Test;
 import org.junit.runner.RunWith;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockServletContext;
@@ -48,14 +48,12 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import javax.inject.Inject;
-import javax.servlet.Filter;
-import javax.validation.constraints.AssertTrue;
-import java.util.Random;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
+import fr.treeptik.cloudunit.model.User;
+import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.ApplicationTemplate;
 
 /**
  * Created by nicolas on 08/09/15.
@@ -65,41 +63,34 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 @ContextConfiguration(classes = {CloudUnitApplicationContext.class, MockServletContext.class})
 @ActiveProfiles("integration")
 public class LogsControllerTestIT {
-
-    protected String release;
-
     private final Logger logger = LoggerFactory.getLogger(LogsControllerTestIT.class);
 
-    @Autowired
+    @Inject
     private WebApplicationContext context;
-
-    private MockMvc mockMvc;
 
     @Inject
     private AuthenticationManager authenticationManager;
 
-    @Autowired
+    @Inject
     private Filter springSecurityFilterChain;
 
     @Inject
     private UserService userService;
 
+    private MockMvc mockMvc;
+
     private MockHttpSession session;
+    
+    private ApplicationTemplate applicationTemplate;
 
-    private ObjectMapper mapper = new ObjectMapper();
-
-    private static String applicationName;
-
-    @BeforeClass
-    public static void initEnv() {
-        applicationName = "app" + new Random().nextInt(100000);
-    }
+    private String applicationName;
+    private ApplicationResource application;
 
     @Before
     public void setup() throws Exception {
-        logger.info("setup");
-
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
+        applicationName = "app" + new Random().nextInt(100000);
+        
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 
         User user = null;
         try {
@@ -117,6 +108,8 @@ public class LogsControllerTestIT {
         securityContext.setAuthentication(result);
         session = new MockHttpSession();
         session.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
+        
+        applicationTemplate = new ApplicationTemplate(mockMvc, session);
     }
 
     @After
@@ -133,8 +126,7 @@ public class LogsControllerTestIT {
      * @throws Exception
      */
     @Test
-    public void test_display_logs_from_tomcat()
-        throws Exception {
+    public void test_display_logs_from_tomcat() throws Exception {
         display_logs_from_tomcat("tomcat-6");
         display_logs_from_tomcat("tomcat-7");
         display_logs_from_tomcat("tomcat-8");
@@ -148,8 +140,7 @@ public class LogsControllerTestIT {
      * @throws Exception
      */
     @Test
-    public void test_list_files_from_tomcat()
-            throws Exception {
+    public void test_list_files_from_tomcat() throws Exception {
         list_files_from_tomcat("tomcat-6");
         list_files_from_tomcat("tomcat-7");
         list_files_from_tomcat("tomcat-8");
@@ -163,31 +154,38 @@ public class LogsControllerTestIT {
      * @throws Exception
      */
     @Test
-    public void test_display_logs_from_apache()
-            throws Exception {
+    public void test_display_logs_from_apache() throws Exception {
         display_logs_from_apache("apache-2-2");
     }
 
     private void display_logs_from_apache(String release) throws Exception {
-        createApplication(applicationName, release);
-        gatherAndCheckLogs(release, "stdout", "Apache");
-        deleteApplication(applicationName);
+        createApplication(release);
+        try {
+            gatherAndCheckLogs(release, "stdout", "Apache");
+        } finally {
+            deleteApplication();
+        }
     }
 
     private void display_logs_from_tomcat(String release) throws Exception {
         String fileToGather = "catalina.log";
         String keyWord = "Catalina";
-        createApplication(applicationName, release);
-        gatherAndCheckLogs(release, fileToGather, keyWord);
-        deleteApplication(applicationName);
+        createApplication(release);
+        try {
+            gatherAndCheckLogs(release, fileToGather, keyWord);
+        } finally {
+            deleteApplication();
+        }
     }
 
-    private void list_files_from_tomcat(String release)
-            throws Exception {
+    private void list_files_from_tomcat(String release) throws Exception {
         String fileToCheck = "catalina.log";
-        createApplication(applicationName, release);
-        list_files_and_check_presence(release, fileToCheck);
-        deleteApplication(applicationName);
+        createApplication(release);
+        try {
+            list_files_and_check_presence(release, fileToCheck);
+        } finally {
+            deleteApplication();
+        }
     }
 
     private void gatherAndCheckLogs(String release, String fileToGather, String keyWord) throws Exception {
@@ -201,20 +199,12 @@ public class LogsControllerTestIT {
         Assert.assertTrue(contentAsString.contains(keyWord));
     }
 
-    private void deleteApplication(String applicationName) throws Exception {
-        logger.info("Delete application : " + applicationName);
-        ResultActions resultats =
-                mockMvc.perform(delete("/application/" + applicationName).session(session).contentType(MediaType.APPLICATION_JSON));
-        resultats.andExpect(status().isOk());
+    private void deleteApplication() throws Exception {
+        applicationTemplate.removeApplication(application);
     }
 
-    private void createApplication(String accentName, String release) throws Exception {
-        logger.info("Create application with accent name " + accentName);
-        final String jsonString = "{\"applicationName\":\"" + accentName + "\", \"serverName\":\"" + release + "\"}";
-        ResultActions resultats =
-                this.mockMvc.perform(post("/application").session(session).contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonString));
-        resultats.andExpect(status().isOk());
+    private void createApplication(String serverType) throws Exception {
+        application = applicationTemplate.createAndAssumeApplication(applicationName, serverType);
     }
 
     private void list_files_and_check_presence(String release, String fileToCheck) throws Exception {

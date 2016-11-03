@@ -15,18 +15,21 @@
 
 package fr.treeptik.cloudunit.security;
 
-import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
-import fr.treeptik.cloudunit.model.User;
-import fr.treeptik.cloudunit.service.UserService;
-import junit.framework.TestCase;
-import org.junit.*;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.*;
+
+import java.util.Random;
+
+import javax.inject.Inject;
+import javax.servlet.Filter;
+
+import org.junit.After;
+import org.junit.Before;
+import org.junit.BeforeClass;
+import org.junit.Test;
 import org.junit.runner.RunWith;
-import org.junit.runners.MethodSorters;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.http.MediaType;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.mock.web.MockHttpSession;
 import org.springframework.mock.web.MockServletContext;
 import org.springframework.security.authentication.AuthenticationManager;
@@ -45,23 +48,14 @@ import org.springframework.test.web.servlet.ResultActions;
 import org.springframework.test.web.servlet.setup.MockMvcBuilders;
 import org.springframework.web.context.WebApplicationContext;
 
-import javax.inject.Inject;
-import javax.servlet.Filter;
-import java.util.Random;
-
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.*;
-import static org.springframework.test.web.servlet.result.MockMvcResultHandlers.print;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
-
-/**
- * Created by nicolas on 08/09/15.
- */
-@RunWith(SpringJUnit4ClassRunner.class)
-@WebAppConfiguration
-@ContextConfiguration(classes = {
-        CloudUnitApplicationContext.class,
-        MockServletContext.class
-})
+import fr.treeptik.cloudunit.dto.AliasResource;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ServerResource;
+import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.initializer.CloudUnitApplicationContext;
+import fr.treeptik.cloudunit.model.User;
+import fr.treeptik.cloudunit.service.UserService;
+import fr.treeptik.cloudunit.test.ApplicationTemplate;
 
 /**
  * This scenario is to verify the protection about resouces between users
@@ -69,51 +63,57 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * We tests between the profils the security for each route.
  *
  */
-
-@FixMethodOrder(MethodSorters.NAME_ASCENDING)
+@RunWith(SpringJUnit4ClassRunner.class)
+@WebAppConfiguration
+@ContextConfiguration(classes = {
+        CloudUnitApplicationContext.class,
+        MockServletContext.class
+})
 @ActiveProfiles("integration")
 @DirtiesContext
-public class SecurityTestIT extends TestCase {
+public class SecurityTestIT {
+    private static final String SERVER_TYPE = "tomcat-8";
 
-    private final Logger logger = LoggerFactory
-        .getLogger(SecurityTestIT.class);
+    private final Logger logger = LoggerFactory.getLogger(SecurityTestIT.class);
 
-    @Autowired
+    @Inject
     private WebApplicationContext context;
-
-    private MockMvc mockMvc;
 
     @Inject
     private AuthenticationManager authenticationManager;
 
-    @Autowired
+    @Inject
     private Filter springSecurityFilterChain;
 
     @Inject
     private UserService userService;
+    
+    @Value("${suffix.cloudunit.io}")
+    private String domain;
+
+    private MockMvc mockMvc;
 
     private MockHttpSession session1;
     private MockHttpSession session2;
+    
+    private ApplicationTemplate applicationTemplate1;
+    private ApplicationTemplate applicationTemplate2;
 
     private static String applicationName;
+    
+    private ApplicationResource application;
 
     // Persist the context for user1
     private User user1 = null;
 
     @BeforeClass
     public static void initEnv() {
-        applicationName = "App"+new Random().nextInt(1000);
+        applicationName = "App"+new Random().nextInt(100000);
     }
 
     @Before
-    public void setup() {
-        logger.info("*********************************");
-        logger.info("             setup               ");
-        logger.info("*********************************");
-
-        this.mockMvc = MockMvcBuilders.webAppContextSetup(context)
-                .addFilters(springSecurityFilterChain)
-                .build();
+    public void setUp() throws Exception {
+        mockMvc = MockMvcBuilders.webAppContextSetup(context).addFilters(springSecurityFilterChain).build();
 
         // If user1 is null (first test) we create its session and its application
         try {
@@ -125,9 +125,7 @@ public class SecurityTestIT extends TestCase {
             SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
             securityContext.setAuthentication(result);
             session1 = new MockHttpSession();
-            session1.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                securityContext);
+            session1.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
         } catch (ServiceException e) {
             logger.error(e.getLocalizedMessage());
         }
@@ -141,122 +139,71 @@ public class SecurityTestIT extends TestCase {
             SecurityContext securityContext = SecurityContextHolder.createEmptyContext();
             securityContext.setAuthentication(result);
             session2 = new MockHttpSession();
-            session2.setAttribute(
-                HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY,
-                securityContext);
+            session2.setAttribute(HttpSessionSecurityContextRepository.SPRING_SECURITY_CONTEXT_KEY, securityContext);
         } catch (ServiceException e) {
             logger.error(e.getLocalizedMessage());
         }
-
-
+        
+        applicationTemplate1 = new ApplicationTemplate(mockMvc, session1);
+        applicationTemplate2 = new ApplicationTemplate(mockMvc, session2);
+        
+        application = applicationTemplate1.createAndAssumeApplication(applicationName, SERVER_TYPE);
     }
 
     @After
-    public void teardown() {
-        logger.info("*********************************");
-        logger.info("             teardown            ");
-        logger.info("*********************************");
+    public void tearDown() throws Exception {
+        applicationTemplate1.removeApplication(application);
+        
         SecurityContextHolder.clearContext();
         session1.invalidate();
         session2.invalidate();
     }
 
-    /**
-     * The First test 00 is only for User1
-     * @throws Exception
-     */
     @Test
-    public void test00_createApplicationUser1() throws Exception {
-        logger.info("*********************************");
-        logger.info(" Create an application for User1 ");
-        logger.info("*********************************");
-        final String jsonString = "{\"applicationName\":\""+applicationName
-                + "\", \"serverName\":\""+"tomcat-8"+"\"}";
-        ResultActions resultats = this.mockMvc
-                .perform(
-                    post("/application").session(session1)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(jsonString));
-        resultats.andExpect(status().isOk());
-
-        logger.info("*********************************");
-        logger.info(" Delete the application for User1 ");
-        logger.info("*********************************");
-        resultats = this.mockMvc
-                .perform(
-                        delete("/application/" + applicationName).session(session1)
-                                .contentType(MediaType.APPLICATION_JSON)
-                                .content(jsonString)).andDo(print());
-        resultats.andExpect(status().isOk());
+    public void test_koUser2StopsUser1Application() throws Exception {
+        applicationTemplate2.stopApplication(application)
+            .andExpect(status().isForbidden());
     }
-
-    // ALL TESTS ARE FOR USER 2 NOW
-
+    
     @Test
-    public void test10_User2triesToManageApplicationUser1() throws Exception {
-        logger.info("************************************************");
-        logger.info(" User2 attemps to manage the application's User1  ");
-        logger.info("************************************************");
-        final String jsonString = "{\"applicationName\":\""+applicationName+"\"}";
-        this.mockMvc
-                .perform(
-                    post("/application/stop").session(session2)
-                                .contentType(MediaType.APPLICATION_JSON)
-                        .content(jsonString)).andDo(print())
-                .andExpect(status().is5xxServerError());
-
-        this.mockMvc
-            .perform(
-                post("/application/start").session(session2)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(jsonString)).andDo(print())
-            .andExpect(status().is5xxServerError());
-
-        this.mockMvc
-            .perform(
-                delete("/application/" + applicationName).session(session2)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(jsonString)).andDo(print())
-            .andExpect(status().is5xxServerError());
+    public void test_koUser2StartsUser1Application() throws Exception {
+        applicationTemplate1.stopApplication(application)
+            .andExpect(status().isNoContent());
+        
+        application = applicationTemplate1.refreshApplication(application);
+        
+        applicationTemplate2.startApplication(application)
+            .andExpect(status().isForbidden());
+    }
+    
+    @Test
+    public void test_koUser2RemovesUser1Application() throws Exception {
+        applicationTemplate2.removeApplication(application)
+            .andExpect(status().isForbidden());
     }
 
     @Test
-    public void test11_User2triesToManageAliasForApplicationUser1() throws Exception {
-
-        logger.info("************************************************");
-        logger.info(" User2 attemps to manage the application's User1  ");
-        logger.info("************************************************");
-
-        String jsonString = "{\"applicationName\":\"" + applicationName + "\",\"alias\":\"myAlias\"}";
-        // create the alias
-        ResultActions resultats = this.mockMvc
-            .perform(
-                post("/application/alias").session(session2)
-                    .contentType(MediaType.APPLICATION_JSON)
-                    .content(jsonString)).andDo(print());
-        resultats.andExpect(status().is5xxServerError());
-
-        // delete the alias
-        resultats = this.mockMvc
-            .perform(
-                delete("/application/" + applicationName + "/alias/myalias").session(session2)
-                    .contentType(MediaType.APPLICATION_JSON)).andDo(print());
-        resultats.andExpect(status().is5xxServerError());
+    public void test_koUser2CreatesAliasForUser1Application() throws Exception {
+        applicationTemplate2.addAlias(application, "myalias" + domain)
+            .andExpect(status().isForbidden());
+    }
+    
+    @Test
+    public void test_koUser2RemovesAliasForUser1Application() throws Exception {
+        ResultActions result = applicationTemplate1.addAlias(application, "myalias" + domain);
+        result.andExpect(status().isCreated());
+        AliasResource alias = applicationTemplate1.getAlias(result);
+        
+        applicationTemplate2.removeAlias(alias)
+            .andExpect(status().isForbidden());
     }
 
     @Test
-    public void test12_User2triesToChangeConfigForApplicationUser1() throws Exception {
-
-        logger.info("************************************************");
-        logger.info(" User2 attemps to manage the application's User1  ");
-        logger.info("************************************************");
-
-        final String jsonString =
-            "{\"applicationName\":\"" + applicationName
-                + "\",\"jvmMemory\":\"512\",\"jvmOptions\":\"\",\"jvmRelease\":\"jdk1.8.0_25\",\"location\":\"webui\"}";
-        ResultActions resultats =
-            this.mockMvc.perform(put("/server/configuration/jvm").session(session2).contentType(MediaType.APPLICATION_JSON).content(jsonString)).andDo(print());
-        resultats.andExpect(status().is5xxServerError());
+    public void test_User2ChangesConfigForUser1Application() throws Exception {
+        ServerResource server = applicationTemplate1.getServer(application);
+        
+        applicationTemplate2.setJvmMemory(server, 512L)
+            .andExpect(status().isForbidden());
     }
 
 }

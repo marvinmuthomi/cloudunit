@@ -16,9 +16,13 @@ package fr.treeptik.cloudunit.model;
 
 import java.io.Serializable;
 import java.util.List;
-import java.util.Map;
 
-import javax.persistence.*;
+import javax.persistence.CascadeType;
+import javax.persistence.Entity;
+import javax.persistence.ManyToOne;
+import javax.persistence.OneToMany;
+import javax.persistence.PostLoad;
+import javax.persistence.Transient;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 
@@ -38,7 +42,7 @@ public class Module extends Container implements Serializable {
 
     private String managerLocation;
 
-    @OneToMany(mappedBy = "module", cascade = { CascadeType.REMOVE, CascadeType.PERSIST })
+    @OneToMany(cascade = { CascadeType.ALL })
     private List<Port> ports;
 
     private Boolean isInitialized;

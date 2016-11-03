@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Tomcat6ElasticSearch24ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Tomcat6ElasticSearch24ModuleControllerTestIT() {
-        super.server = "tomcat-6";
-        super.module = "elasticsearch-2.4";
+        super.serverType = "tomcat-6";
+        super.moduleName = "elasticsearch-2.4";
         super.numberPort = "9200";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Tomcat6ElasticSearch24ModuleControllerTestIT extends AbstractModule
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckElasticSearchConnection().invoke(forwardedPort);
     }
 }

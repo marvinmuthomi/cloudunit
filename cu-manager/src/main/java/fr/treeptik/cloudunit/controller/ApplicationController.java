@@ -30,8 +30,8 @@ import javax.validation.Valid;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.hateoas.Link;
 import org.springframework.hateoas.Resources;
-import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -48,23 +48,14 @@ import fr.treeptik.cloudunit.config.events.ApplicationStopEvent;
 import fr.treeptik.cloudunit.dto.AliasResource;
 import fr.treeptik.cloudunit.dto.ApplicationCreationRequest;
 import fr.treeptik.cloudunit.dto.ApplicationResource;
-import fr.treeptik.cloudunit.dto.ContainerUnit;
-import fr.treeptik.cloudunit.dto.EnvUnit;
-import fr.treeptik.cloudunit.dto.HttpOk;
-import fr.treeptik.cloudunit.dto.JsonInput;
-import fr.treeptik.cloudunit.dto.JsonResponse;
 import fr.treeptik.cloudunit.dto.PortResource;
-import fr.treeptik.cloudunit.enums.RemoteExecAction;
 import fr.treeptik.cloudunit.exception.CheckException;
-import fr.treeptik.cloudunit.exception.FatalDockerJSONException;
 import fr.treeptik.cloudunit.exception.ServiceException;
-import fr.treeptik.cloudunit.factory.EnvUnitFactory;
 import fr.treeptik.cloudunit.model.Application;
 import fr.treeptik.cloudunit.model.PortToOpen;
 import fr.treeptik.cloudunit.model.Status;
 import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.ApplicationService;
-import fr.treeptik.cloudunit.service.DockerService;
 import fr.treeptik.cloudunit.utils.AuthentificationUtils;
 import fr.treeptik.cloudunit.utils.CheckUtils;
 
@@ -84,11 +75,49 @@ public class ApplicationController {
 	private AuthentificationUtils authentificationUtils;
 
 	@Inject
-	private DockerService dockerService;
-
-	@Inject
 	private ApplicationEventPublisher applicationEventPublisher;
 
+    private ApplicationResource buildResource(Application application) {
+        ApplicationResource resource = new ApplicationResource(application);
+        
+        try {
+            resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
+                    .withSelfRel());
+            
+            resource.add(linkTo(methodOn(ServerController.class).getServer(application.getId()))
+                    .withRel("server"));
+            
+            resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
+                    .withRel("deployments"));
+                        
+            resource.add(linkTo(methodOn(ApplicationController.class).aliases(application.getId()))
+                    .withRel("aliases"));
+            
+            resource.add(linkTo(methodOn(ModuleController.class).getModules(application.getId()))
+                    .withRel("modules"));
+            
+            resource.add(linkTo(methodOn(ApplicationController.class).getPorts(application.getId()))
+                    .withRel("ports"));
+            
+            if (EnumSet.of(Status.START, Status.STOP).contains(application.getStatus())) {
+                resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(application.getId()))
+                        .withRel("restart"));
+                
+                if (application.getStatus() == Status.START) {
+                    resource.add(linkTo(methodOn(ApplicationController.class).stopApplication(application.getId()))
+                            .withRel("stop"));
+                } else {
+                    resource.add(linkTo(methodOn(ApplicationController.class).startApplication(application.getId()))
+                            .withRel("start"));
+                }
+            }
+        } catch (ServiceException | CheckException e) {
+            // ignore
+        }
+        
+        return resource;
+    }
+	
 	/**
 	 * CREATE AN APPLICATION
 	 *
@@ -112,6 +141,88 @@ public class ApplicationController {
 		return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
 	}
 
+	/**
+     * Return the list of applications for an User
+     *
+     * @return
+     * @throws ServiceException
+     */
+    @RequestMapping(method = RequestMethod.GET)
+    public ResponseEntity<?> findAllByUser() throws ServiceException {
+        User user = this.authentificationUtils.getAuthentificatedUser();
+        List<Application> applications = applicationService.findAllByUser(user);
+
+        logger.debug("Number of applications {}", applications.size());
+        
+        Resources<ApplicationResource> resources = new Resources<>(
+                applications.stream()
+                .map(this::buildResource)
+                .collect(Collectors.toList()));
+        
+        resources.add(linkTo(methodOn(ApplicationController.class).findAllByUser()).withSelfRel());
+        
+        return ResponseEntity.ok(resources);
+    }
+	
+    /**
+     * Return detailed information about application
+     *
+     * @return
+     * @throws ServiceException
+     */
+    @CloudUnitSecurable
+    @RequestMapping(value = "/{applicationId}", method = RequestMethod.GET)
+    public ResponseEntity<?> detail(@PathVariable Integer applicationId) throws ServiceException, CheckException {
+        Application application = applicationService.findById(applicationId);
+        
+        if (application == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        ApplicationResource resource = buildResource(application);
+        return ResponseEntity.ok(resource);
+    }
+
+    /**
+     * DELETE AN APPLICATION
+     *
+     * @param jsonInput
+     * @return
+     * @throws ServiceException
+     * @throws CheckException
+     */
+    @CloudUnitSecurable
+    @RequestMapping(value = "/{applicationId}", method = RequestMethod.DELETE)
+    public ResponseEntity<?> deleteApplication(@PathVariable Integer applicationId)
+            throws ServiceException, CheckException {
+        User user = this.authentificationUtils.getAuthentificatedUser();
+        Application application = applicationService.findById(applicationId);
+        
+        if (application == null) {
+            return ResponseEntity.notFound().build();
+        }
+
+        // We must be sure there is no running action before starting new one
+        authentificationUtils.canStartDeleteApplicationAction(user, application, Locale.ENGLISH);
+
+        try {
+            // Application busy
+            // set the application in pending mode
+            applicationEventPublisher.publishEvent(new ApplicationPendingEvent(application));
+
+            logger.info("Removing application: {}", application.getName());
+            applicationService.remove(application, user);
+
+        } catch (ServiceException e) {
+            // set the application in pending mode
+            applicationEventPublisher.publishEvent(new ApplicationFailEvent(application));
+        }
+
+        logger.info("Application {} is deleted.", application.getName());
+
+        return ResponseEntity.noContent().build();
+    }
+    
 	/**
 	 * START AN APPLICATION
 	 *
@@ -215,142 +326,11 @@ public class ApplicationController {
         return ResponseEntity.noContent().build();
 	}
 
-	/**
-	 * DELETE AN APPLICATION
-	 *
-	 * @param jsonInput
-	 * @return
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@CloudUnitSecurable
-	@RequestMapping(value = "/{applicationId}", method = RequestMethod.DELETE)
-	public ResponseEntity<?> deleteApplication(@PathVariable Integer applicationId)
-	        throws ServiceException, CheckException {
-	    User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findById(applicationId);
-
-		// We must be sure there is no running action before starting new one
-		authentificationUtils.canStartDeleteApplicationAction(user, application, Locale.ENGLISH);
-
-		try {
-			// Application busy
-			// set the application in pending mode
-			applicationEventPublisher.publishEvent(new ApplicationPendingEvent(application));
-
-			logger.info("Removing application: {}", application.getName());
-			applicationService.remove(application, user);
-
-		} catch (ServiceException e) {
-			// set the application in pending mode
-			applicationEventPublisher.publishEvent(new ApplicationFailEvent(application));
-		}
-
-		logger.info("Application {} is deleted.", application.getName());
-
-		return ResponseEntity.noContent().build();
-	}
-	
-	private ApplicationResource buildResource(Application application) {
-	    ApplicationResource resource = new ApplicationResource(application);
-	    
-	    try {
-    	    resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
-    	            .withSelfRel());
-    	    
-    	    resource.add(linkTo(methodOn(ServerController.class).getServer(application.getId()))
-    	            .withRel("server"));
-    	    
-    	    resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
-    	            .withRel("deployments"));
-    	    
-    	    resource.add(linkTo(methodOn(ApplicationController.class).aliases(application.getId()))
-    	            .withRel("aliases"));
-    	    
-    	    if (EnumSet.of(Status.START, Status.STOP).contains(application.getStatus())) {
-                resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(application.getId()))
-                        .withRel("restart"));
-                
-    	        if (application.getStatus() == Status.START) {
-    	            resource.add(linkTo(methodOn(ApplicationController.class).stopApplication(application.getId()))
-    	                    .withRel("stop"));
-    	        } else {
-    	            resource.add(linkTo(methodOn(ApplicationController.class).startApplication(application.getId()))
-    	                    .withRel("start"));
-    	        }
-    	    }
-	    } catch (ServiceException | CheckException e) {
-	        // TODO deal with exception architecture
-	        throw new RuntimeException(e);
-	    }
-	    
-	    return resource;
-	}
-
-	/**
-	 * Return detailed information about application
-	 *
-	 * @return
-	 * @throws ServiceException
-	 */
-	@CloudUnitSecurable
-	@RequestMapping(value = "/{applicationId}", method = RequestMethod.GET)
-	public ResponseEntity<?> detail(@PathVariable Integer applicationId) throws ServiceException, CheckException {
-		Application application = applicationService.findById(applicationId);
-		
-		if (application == null) {
-		    return ResponseEntity.notFound().build();
-		}
-		
-		ApplicationResource resource = buildResource(application);
-		return ResponseEntity.ok(resource);
-	}
-
-	/**
-	 * Return the list of applications for an User
-	 *
-	 * @return
-	 * @throws ServiceException
-	 */
-	@RequestMapping(method = RequestMethod.GET)
-	public ResponseEntity<?> findAllByUser() throws ServiceException {
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		List<Application> applications = applicationService.findAllByUser(user);
-
-		logger.debug("Number of applications {}", applications.size());
-		
-		Resources<ApplicationResource> resources = new Resources<>(
-		        applications.stream()
-		        .map(this::buildResource)
-		        .collect(Collectors.toList()));
-		
-		resources.add(linkTo(methodOn(ApplicationController.class).findAllByUser()).withSelfRel());
-		
-		return ResponseEntity.ok(resources);
-	}
-
-	/**
-	 * Return the list of containers for an application (module, server or
-	 * tools)
-	 *
-	 * @param applicationName
-	 * @return
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/containers", method = RequestMethod.GET)
-	public List<ContainerUnit> listContainer(@PathVariable String applicationName)
-			throws ServiceException, CheckException {
-		logger.debug("applicationName:" + applicationName);
-		return applicationService.listContainers(applicationName);
-	}
-	
 	private AliasResource buildAliasResource(Application application, String alias) {
 	    AliasResource resource = new AliasResource(alias);
 	    
 	    try {
-            resource.add(linkTo(methodOn(ApplicationController.class).alias(application.getId(), alias))
+            resource.add(linkTo(methodOn(ApplicationController.class).getAlias(application.getId(), alias))
                     .withSelfRel());
         } catch (CheckException | ServiceException e) {
             // ignore
@@ -359,6 +339,31 @@ public class ApplicationController {
 	    return resource;
 	}
 
+    /**
+     * Add an alias for an application
+     *
+     * @param input
+     * @return
+     * @throws ServiceException
+     * @throws CheckException
+     */
+    @CloudUnitSecurable
+    @RequestMapping(value = "/{applicationId}/aliases", method = RequestMethod.POST)
+    public ResponseEntity<?> addAlias(@PathVariable Integer applicationId, @Valid @RequestBody AliasResource request)
+            throws ServiceException, CheckException {
+        User user = this.authentificationUtils.getAuthentificatedUser();
+        Application application = applicationService.findById(applicationId);
+
+        // We must be sure there is no running action before starting new one
+        authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
+
+        String alias = applicationService.addNewAlias(application, request.getName());
+        
+        AliasResource resource = buildAliasResource(application, alias);
+        
+        return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
+    }
+    
 	/**
 	 * Return the list of aliases for an application
 	 *
@@ -393,34 +398,8 @@ public class ApplicationController {
 		return ResponseEntity.ok(resources);
 	}
 
-	/**
-	 * Add an alias for an application
-	 *
-	 * @param input
-	 * @return
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/{applicationId}/aliases", method = RequestMethod.POST)
-	public ResponseEntity<?> addAlias(@PathVariable Integer applicationId, @Valid @RequestBody AliasResource request)
-	        throws ServiceException, CheckException {
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findById(applicationId);
-
-		// We must be sure there is no running action before starting new one
-		authentificationUtils.canStartNewAction(user, application, Locale.ENGLISH);
-
-		String alias = applicationService.addNewAlias(application, request.getName());
-		
-		AliasResource resource = buildAliasResource(application, alias);
-		
-		return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
-	}
-	
     @RequestMapping(value = "/{applicationId}/aliases/{aliasName}", method = RequestMethod.GET)
-    public ResponseEntity<?> alias(@PathVariable Integer applicationId, @PathVariable String aliasName)
+    public ResponseEntity<?> getAlias(@PathVariable Integer applicationId, @PathVariable String aliasName)
             throws ServiceException, CheckException {
         Application application = applicationService.findById(applicationId);
         
@@ -481,7 +460,7 @@ public class ApplicationController {
                 .findAny();
         
         if (!alias.isPresent()) {
-            ResponseEntity.notFound().build();
+            return ResponseEntity.notFound().build();
         }
 
 		// We must be sure there is no running action before starting new one
@@ -490,6 +469,25 @@ public class ApplicationController {
 		applicationService.removeAlias(application, aliasName);
 
 		return ResponseEntity.noContent().build();
+	}
+	
+	private PortResource buildPortResource(Application application, PortToOpen port) {
+	    PortResource resource = new PortResource(port);
+	    
+	    try {
+            resource.add(linkTo(methodOn(ApplicationController.class).getPort(application.getId(), port.getPort()))
+                    .withSelfRel());
+            
+            resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
+                    .withRel("application"));
+            
+            resource.add(new Link(port.getAlias(), "open"));
+        } catch (CheckException | ServiceException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+	    
+	    return resource;
 	}
 
 	/**
@@ -504,31 +502,68 @@ public class ApplicationController {
 	 * @throws CheckException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/ports", method = RequestMethod.POST)
-	public ResponseEntity<PortResource> addPort(@RequestBody JsonInput input) throws ServiceException, CheckException {
-
+	@RequestMapping(value = "/{applicationId}/ports", method = RequestMethod.POST)
+	public ResponseEntity<?> addPort(@PathVariable Integer applicationId, @Valid @RequestBody PortResource request)
+	        throws ServiceException, CheckException {
 		if (logger.isDebugEnabled()) {
-			logger.debug(input.toString());
+			logger.debug(request.toString());
 		}
 
-		String applicationName = input.getApplicationName();
-		String nature = input.getPortNature();
-		Boolean isQuickAccess = input.getPortQuickAccess();
+		Application application = applicationService.findById(applicationId);
 		
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
+		if (application == null) {
+		    return ResponseEntity.notFound().build();
+		}
 
-		CheckUtils.validateOpenPort(input.getPortToOpen(), application);
-		CheckUtils.isPortFree(input.getPortToOpen(), application);
-		CheckUtils.validateNatureForOpenPortFeature(input.getPortNature(), application);
+		CheckUtils.isPortFree(request.getNumber(), application);
+		CheckUtils.validateNatureForOpenPortFeature(request.getNature(), application);
 
-		Integer port = Integer.parseInt(input.getPortToOpen());
-		PortToOpen portToOpen= applicationService.addPort(application, nature, port, isQuickAccess);
-		PortResource portResource = new PortResource(portToOpen);
-		return ResponseEntity.status(HttpStatus.OK).body(portResource);
+		PortToOpen portToOpen = applicationService.addPort(application,
+		        request.getNature(),
+		        request.getNumber(),
+		        request.isQuickAccess());
+		
+		PortResource resource = buildPortResource(application, portToOpen);
+		return ResponseEntity.created(URI.create(resource.getId().getHref())).body(resource);
 	}
 
+    @CloudUnitSecurable
+    @RequestMapping(value = "/{applicationId}/ports", method = RequestMethod.GET)
+    public ResponseEntity<?> getPorts(@PathVariable Integer applicationId)
+            throws ServiceException, CheckException {
+
+        Application application = applicationService.findById(applicationId);
+
+        Resources<PortResource> resources = new Resources<>(
+                application.getPortsToOpen().stream()
+                .map(p -> buildPortResource(application, p))
+                .collect(Collectors.toList()));
+        
+        return ResponseEntity.ok(resources);
+    }
+    
+    @CloudUnitSecurable
+    @RequestMapping(value = "/{applicationId}/ports/{portNumber}", method = RequestMethod.GET)
+    public ResponseEntity<?> getPort(@PathVariable Integer applicationId, @PathVariable Integer portNumber)
+            throws ServiceException, CheckException {
+        Application application = applicationService.findById(applicationId);
+        
+        if (application == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Optional<PortToOpen> port = application.getPortsToOpen().stream()
+                .filter(p -> p.getPort().equals(portNumber))
+                .findAny();
+        
+        if (!port.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        PortResource resource = buildPortResource(application, port.get());
+        return ResponseEntity.ok(resource);
+    }
+	
 	/**
 	 * Delete a port for an application
 	 *
@@ -538,50 +573,28 @@ public class ApplicationController {
 	 * @throws CheckException
 	 */
 	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/ports/{portToOpen}", method = RequestMethod.DELETE)
-	public JsonResponse removePort(JsonInput input) throws ServiceException, CheckException {
+	@RequestMapping(value = "/{applicationId}/ports/{portNumber}", method = RequestMethod.DELETE)
+	public ResponseEntity<?> removePort(@PathVariable Integer applicationId, @PathVariable Integer portNumber)
+	        throws ServiceException, CheckException {
+	    logger.debug("application id: {}; port number: {}", applicationId, portNumber);
 
-		String applicationName = input.getApplicationName();
+		Application application = applicationService.findById(applicationId);
 
-		if (logger.isDebugEnabled()) {
-			logger.debug("application.name=" + applicationName);
-			logger.debug("application.port=" + input.getPortToOpen());
-		}
+        if (application == null) {
+            return ResponseEntity.notFound().build();
+        }
+        
+        Optional<PortToOpen> port = application.getPortsToOpen().stream()
+                .filter(p -> p.getPort().equals(portNumber))
+                .findAny();
+        
+        if (!port.isPresent()) {
+            return ResponseEntity.notFound().build();
+        }
 
-		User user = this.authentificationUtils.getAuthentificatedUser();
-		Application application = applicationService.findByNameAndUser(user, applicationName);
+        applicationService.removePort(application, portNumber);
 
-		CheckUtils.validateOpenPort(input.getPortToOpen(), application);
-		Integer port = Integer.parseInt(input.getPortToOpen());
-		applicationService.removePort(application, port);
-
-		return new HttpOk();
+		return ResponseEntity.noContent().build();
 	}
-
-	/**
-	 * Display env variables for a container
-	 *
-	 * @param applicationName
-	 * @return
-	 * @throws ServiceException
-	 * @throws CheckException
-	 */
-	@CloudUnitSecurable
-	@ResponseBody
-	@RequestMapping(value = "/{applicationName}/container/{containerName}/env", method = RequestMethod.GET)
-	public List<EnvUnit> displayEnv(@PathVariable String applicationName, @PathVariable String containerName)
-			throws ServiceException, CheckException {
-		List<EnvUnit> envUnits = null;
-		try {
-			User user = this.authentificationUtils.getAuthentificatedUser();
-			String content = dockerService.execCommand(containerName,
-					RemoteExecAction.GATHER_CU_ENV.getCommand() + " " + user.getLogin());
-			logger.debug(content);
-			envUnits = EnvUnitFactory.fromOutput(content);
-		} catch (FatalDockerJSONException e) {
-			throw new ServiceException(applicationName + ", " + containerName, e);
-		}
-		return envUnits;
-	}
+	
 }

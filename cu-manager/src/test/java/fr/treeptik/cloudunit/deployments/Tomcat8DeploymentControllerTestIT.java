@@ -1,10 +1,7 @@
 package fr.treeptik.cloudunit.deployments;
 
-public class Tomcat8DeploymentControllerTestIT
-    extends AbstractTomcatDeploymentControllerTestIT
-{
-    public Tomcat8DeploymentControllerTestIT()
-    {
-        super.release = "tomcat-8";
+public class Tomcat8DeploymentControllerTestIT extends AbstractTomcatDeploymentControllerTestIT {
+    public Tomcat8DeploymentControllerTestIT() {
+        super("tomcat-8");
     }
 }

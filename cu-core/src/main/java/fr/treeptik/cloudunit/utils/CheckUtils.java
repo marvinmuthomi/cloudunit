@@ -17,6 +17,7 @@ package fr.treeptik.cloudunit.utils;
 
 import java.util.EnumSet;
 import java.util.Locale;
+import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
@@ -25,6 +26,7 @@ import org.springframework.context.MessageSource;
 import fr.treeptik.cloudunit.enums.JvmMemory;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.PortToOpen;
 
 /**
  * Created by nicolas on 18/08/2014.
@@ -82,10 +84,13 @@ public class CheckUtils {
 	 * @param application
 	 * @throws CheckException
 	 */
-	public static void isPortFree(String port, Application application) throws CheckException {
-		Long numberOfThisPort = application.getPortsToOpen().stream()
-				.filter(t -> t.getPort().equals(Integer.parseInt(port))).count();
-		if (numberOfThisPort != 0) {
+	public static void isPortFree(Integer number, Application application) throws CheckException {
+	    // TODO feature stealing: should be in Application class
+		Optional<PortToOpen> port = application.getPortsToOpen().stream()
+				.filter(t -> t.getPort().equals(number))
+				.findAny();
+		
+		if (port.isPresent()) {
 			String messageTranslated = messageSource.getMessage("port.already.used", null, Locale.ENGLISH);
 			throw new CheckException(messageTranslated + " : " + port);
 		}

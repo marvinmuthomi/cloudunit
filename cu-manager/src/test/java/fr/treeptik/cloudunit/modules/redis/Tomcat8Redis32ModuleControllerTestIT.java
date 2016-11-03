@@ -23,8 +23,8 @@ import fr.treeptik.cloudunit.modules.AbstractModuleControllerTestIT;
 public class Tomcat8Redis32ModuleControllerTestIT extends AbstractModuleControllerTestIT {
 
     public Tomcat8Redis32ModuleControllerTestIT() {
-        super.server = "tomcat-8";
-        super.module = "redis-3-2";
+        super.serverType = "tomcat-8";
+        super.moduleName = "redis-3-2";
         super.numberPort = "6379";
         super.managerPrefix = "";
         super.managerSuffix = "";
@@ -32,7 +32,7 @@ public class Tomcat8Redis32ModuleControllerTestIT extends AbstractModuleControll
     }
 
     @Override
-    protected void checkConnection(String forwardedPort) {
+    protected void checkConnection(String forwardedPort) throws Exception {
         new CheckRedisConnection().invoke(forwardedPort);
     }
 }

@@ -24,7 +24,6 @@ import com.spotify.docker.client.DockerClient;
 import com.spotify.docker.client.LogStream;
 import com.spotify.docker.client.exceptions.ContainerNotFoundException;
 import com.spotify.docker.client.exceptions.DockerException;
-import com.spotify.docker.client.messages.Container;
 import com.spotify.docker.client.messages.ContainerInfo;
 
 import fr.treeptik.cloudunit.docker.core.DockerCloudUnitClient;
@@ -201,14 +200,14 @@ public class DockerServiceImpl implements DockerService {
 
     @Override
     public List<String> listContainers() throws FatalDockerJSONException {
-        List<String> containersId = null;
         try {
-            List<Container> containers = dockerClient.listContainers(DockerClient.ListContainersParam.allContainers());
-            containersId = containers.stream().map(c -> c.id()).collect(Collectors.toList());
+            return dockerClient.listContainers(DockerClient.ListContainersParam.allContainers()).stream()
+                    .map(c -> c.id())
+                    .collect(Collectors.toList());
         } catch (DockerException | InterruptedException e) {
             logger.error(e.getMessage());
+            return null;
         }
-        return containersId;
     }
 
     @Override
@@ -314,12 +313,11 @@ public class DockerServiceImpl implements DockerService {
         logger.info("Volumes to add : " + volumes.toString());
 
         // map ports
-        final Map<String, String> ports =  new HashMap<>();
+        // /!\ Collectors.toMap doesn't play nicely with null values (see Map.merge)
+        Map<String, String> ports = new HashMap<>();
         module.getPorts().stream()
-                .filter(p -> p.getOpened())
-                .forEach(p->{
-                         ports.put(String.format("%s/tcp", p.getContainerValue()), p.getHostValue());
-                });
+                .filter(p -> p.isOpen())
+                .forEach(p -> ports.put(String.format("%s/tcp", p.getContainerValue()), p.getHostValue()));
         DockerContainer container = ContainerUtils.newCreateInstance(containerName, imagePath, null, null, volumes,
                 envs, ports);
         dockerCloudUnitClient.createContainer(container);

@@ -61,33 +61,33 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     @Override
     @Transactional
     @CacheEvict(value = "env", allEntries = true)
-    public EnvironmentVariable save(User user, EnvironmentVariable environment, String applicationName,
-            String containerName) throws ServiceException {
-        checkEnvironmentVariableConsistence(environment, containerName);
-        Application application = null;
+    public EnvironmentVariable save(Application application, String containerName, String variableName, String value)
+            throws ServiceException {
+        checkEnvironmentVariableConsistence(variableName, containerName);
+        EnvironmentVariable variable = new EnvironmentVariable();
+        variable.setKeyEnv(variableName);
+        variable.setValueEnv(value);
+        variable.setApplication(application);
+        variable.setContainerName(containerName);
+
         try {
-            application = applicationService.findByNameAndUser(user, applicationName);
             stopAndRemoveContainer(containerName, application);
-            environment.setApplication(application);
-            environment.setContainerName(containerName);
-            environment = environmentDAO.save(environment);
+            variable = environmentDAO.save(variable);
             recreateAndMountVolumes(containerName, application);
         } catch (CheckException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("environment:[").append(environment).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            logger.error(msgError.toString());
+            logger.error("applicationName: {}; containerName: {}; environment: {}",
+                    application.getName(),
+                    containerName,
+                    variable);
             throw new CheckException(e.getMessage(), e);
         } catch (ServiceException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("environment:[").append(environment).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            logger.error(msgError.toString());
+            logger.error("applicationName: {}; containerName: {}; environment: {}",
+                    application.getName(),
+                    containerName,
+                    variable);
             throw new ServiceException(e.getMessage(), e);
         }
-        return environment;
+        return variable;
     }
 
     @Override
@@ -95,7 +95,7 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     @CacheEvict(value = "env", allEntries = true)
     public void save(User user, List<EnvironmentVariable> environments, String applicationName, String containerName)
             throws ServiceException {
-        environments.stream().forEach(e -> checkEnvironmentVariableConsistence(e, containerName));
+        environments.stream().forEach(e -> checkEnvironmentVariableConsistence(e.getKeyEnv(), containerName));
         final Application application = applicationService.findByNameAndUser(user, applicationName);
         try {
             stopAndRemoveContainer(containerName, application);
@@ -146,32 +146,18 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     @Override
     @Transactional
     @CacheEvict(value = "env", allEntries = true)
-    public void delete(User user, int id, String applicationName, String containerName) throws ServiceException {
+    public void delete(Application application, String containerName, int id) throws ServiceException {
         Server server = null;
-        Application application = null;
         try {
             server = serverService.findByName(containerName);
-            application = applicationService.findByNameAndUser(user, applicationName);
             stopAndRemoveContainer(containerName, application);
             EnvironmentVariable environmentVariable = loadEnvironnment(id);
             environmentDAO.delete(environmentVariable);
             recreateAndMountVolumes(containerName, application);
-        } catch (CheckException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("id:[").append(id).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            logger.error(msgError.toString());
-            throw new CheckException(e.getMessage(), e);
-        } catch (ServiceException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("id:[").append(id).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            logger.error(msgError.toString());
-            throw new ServiceException(e.getMessage(), e);
         } finally {
-            applicationEventPublisher.publishEvent(new ServerStartEvent(server));
+            if (server != null) {
+                applicationEventPublisher.publishEvent(new ServerStartEvent(server));
+            }
             applicationEventPublisher.publishEvent(new ApplicationStartEvent(application));
         }
     }
@@ -211,47 +197,28 @@ public class EnvironmentServiceImpl implements EnvironmentService {
     @Override
     @Transactional
     @CacheEvict(value = "env", allEntries = true)
-    public EnvironmentVariable update(User user, EnvironmentVariable environmentVariable, String applicationName,
-            String containerName, Integer id) throws ServiceException {
-        checkEnvironmentVariableConsistence(environmentVariable, containerName);
-        Application application = null;
+    public EnvironmentVariable update(Application application, String containerName, Integer id, String value)
+            throws ServiceException {
         try {
-            loadEnvironnment(id);
-            application = applicationService.findByNameAndUser(user, applicationName);
+            EnvironmentVariable variable = loadEnvironnment(id);
             stopAndRemoveContainer(containerName, application);
-            environmentVariable.setId(id);
-            environmentVariable.setContainerName(containerName);
-            environmentVariable.setApplication(application);
-            environmentVariable = environmentDAO.save(environmentVariable);
+            variable.setValueEnv(value);
+            variable = environmentDAO.save(variable);
             recreateAndMountVolumes(containerName, application);
-        } catch (CheckException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("environmentVariable:[").append(environmentVariable).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            throw new CheckException(e.getMessage(), e);
-        } catch (ServiceException e) {
-            StringBuilder msgError = new StringBuilder();
-            msgError.append("environmentVariable:[").append(environmentVariable).append("]");
-            msgError.append(", applicationName:[").append(applicationName).append("]");
-            msgError.append(", containerName:[").append(containerName).append("]");
-            logger.error(msgError.toString());
-            throw new ServiceException(e.getMessage(), e);
+            return variable;
         } finally {
-
             applicationEventPublisher.publishEvent(new ApplicationStartEvent(application));
         }
-        return environmentVariable;
     }
 
-    private void checkEnvironmentVariableConsistence(EnvironmentVariable environmentVariable, String containerName) {
-        if (environmentVariable.getKeyEnv() == null || environmentVariable.getKeyEnv().isEmpty())
+    private void checkEnvironmentVariableConsistence(String variableName, String containerName) {
+        if (variableName == null || !variableName.matches("^[_a-zA-Z][-_a-zA-Z0-9]+$"))
             throw new CheckException("This key is not consistent !");
-        if (!environmentVariable.getKeyEnv().matches("^[-a-zA-Z0-9_]*$"))
-            throw new CheckException("This key is not consistent : " + environmentVariable.getKeyEnv());
+
         List<EnvironmentVariable> environmentList = environmentDAO.findByContainer(containerName);
         Optional<EnvironmentVariable> value = environmentList.stream()
-                .filter(v -> v.getKeyEnv().equals(environmentVariable.getKeyEnv())).findFirst();
+                .filter(v -> v.getKeyEnv().equals(variableName))
+                .findFirst();
         if (value.isPresent())
             throw new CheckException("This key already exists");
     }

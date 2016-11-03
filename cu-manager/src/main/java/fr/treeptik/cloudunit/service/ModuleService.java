@@ -23,6 +23,7 @@ import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.ServiceException;
 import fr.treeptik.cloudunit.model.Application;
 import fr.treeptik.cloudunit.model.Module;
+import fr.treeptik.cloudunit.model.Port;
 import fr.treeptik.cloudunit.model.Status;
 import fr.treeptik.cloudunit.model.User;
 
@@ -56,8 +57,7 @@ public interface ModuleService {
 
     Module create(String imageName, Application application, User user) throws ServiceException, CheckException;
 
-    Module publishPort(Integer id, Boolean publishPort, String port, User user) throws ServiceException, CheckException;
-
-    String runScript(String moduleName, MultipartFile file) throws ServiceException;
-
+    Port publishPort(Module module, String port, boolean open, User user) throws ServiceException, CheckException;
+    
+    String runScript(Module module, MultipartFile file) throws ServiceException;
 }
