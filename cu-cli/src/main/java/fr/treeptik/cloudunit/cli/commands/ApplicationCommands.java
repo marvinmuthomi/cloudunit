@@ -86,13 +86,14 @@ public class ApplicationCommands implements CommandMarker {
 		return applicationUtils.listAll();
 	}
 
-	@CliCommand(value = "deploy", help = "Deploy an archive ear/war on the app servers")
+	@CliCommand(value = "deploy", help = "Deploy a WAR/EAR/JAR archive")
 	public String deploy(
 	        @CliOption(key = "path", mandatory = true, help = "Path of the archive file") File path,
+	        @CliOption(key = "contextPath", mandatory = false, help = "Context path") String contextPath,
 			@CliOption(key = "openBrowser", mandatory = false, help = "Open a browser to location",
 			    unspecifiedDefaultValue = "true") boolean openBrowser)
 			throws URISyntaxException, MalformedURLException {
-	    return applicationUtils.deployFromAWar(path, openBrowser);
+	    return applicationUtils.deployFromAWar(path, contextPath, openBrowser);
 	}
 
 	@CliCommand(value = "list-aliases", help = "Display all application aliases")
@@ -117,37 +118,36 @@ public class ApplicationCommands implements CommandMarker {
 
 	@CliCommand(value = "create-var-env", help = "Create a new environment variable")
 	public String createEnvironmentVariable(
-			@CliOption(key = {"name"}, mandatory = false, help = "Application name to remove ") String applicationName,
-			@CliOption(key = {"", "key"}, mandatory = true, help = "Key to the environment variable") String key,
-			@CliOption(key = {"", "value"}, mandatory = true, help = "Value to the environment variable") String value) {
+			@CliOption(key = {"name"}, mandatory = false, help = HELP_APPLICATION_NAME) String applicationName,
+			@CliOption(key = {"", "key"}, mandatory = true, help = "Name of the environment variable") String key,
+			@CliOption(key = {"", "value"}, mandatory = true, help = "Value of the environment variable") String value) {
 		return applicationUtils.createEnvironmentVariable(applicationName, key, value);
 	}
 
     @CliCommand(value = "rm-var-env", help = "Create a new environment variable")
     public String removeEnvironmentVariable(
-            @CliOption(key = {"name"}, mandatory = false, help = "Application name to remove ") String applicationName,
-            @CliOption(key = {"", "key"}, mandatory = true, help = "Key to the environment variable") String key) {
+            @CliOption(key = {"name"}, mandatory = false, help = HELP_APPLICATION_NAME) String applicationName,
+            @CliOption(key = {"", "key"}, mandatory = true, help = "Name of the environment variable") String key) {
         return applicationUtils.removeEnvironmentVariable(applicationName, key);
     }
 
 	@CliCommand(value = "update-var-env", help = "Update a existing environment variable")
 	public String updateEnvironmentVariable(
 			@CliOption(key = {"name"}, mandatory = false, help = "Application name to remove ") String applicationName,
-			@CliOption(key = {"", "old-key"}, mandatory = true, help = "Old key to the environment variable") String oldKey,
-			@CliOption(key = {"", "new-key"}, mandatory = true, help = "New key to the environment variable") String newKey,
-			@CliOption(key = {"", "value"}, mandatory = true, help = "New value to the environment variable") String value) {
-		return applicationUtils.updateEnvironmentVariable(applicationName, oldKey, newKey, value);
+			@CliOption(key = {"", "key"}, mandatory = true, help = "Name of the environment variable") String key,
+			@CliOption(key = {"", "value"}, mandatory = true, help = "New value for the environment variable") String value) {
+		return applicationUtils.updateEnvironmentVariable(applicationName, key, value);
 	}
 
     @CliCommand(value = "list-var-env", help = "List all environment variables")
     public String listEnvironmentVariables(
-            @CliOption(key = {"name"}, mandatory = false, help = "Application name to remove ") String applicationName) {
+            @CliOption(key = {"name"}, mandatory = false, help = HELP_APPLICATION_NAME) String applicationName) {
         return applicationUtils.listAllEnvironmentVariables(applicationName);
     }
 
     @CliCommand(value = "list-containers", help = "List all containers")
 	public String listContainers(
-			@CliOption(key = {"name"}, mandatory = false, help = "Application name to remove ") String applicationName) {
+			@CliOption(key = {"name"}, mandatory = false, help = HELP_APPLICATION_NAME) String applicationName) {
     	return applicationUtils.listContainers(applicationName);
 	}
 }

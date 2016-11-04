@@ -29,7 +29,7 @@ public class ServerCommand implements CommandMarker {
 
     @CliCommand(value = "change-jvm-memory", help = "Change memory of the application server")
     public String changeMemory(
-            @CliOption(key = {"size"}, mandatory = true, help = "Available memory size (Mo) {512, 1024, 2048, 3072}") String memorySize) {
+            @CliOption(key = {"size"}, mandatory = true, help = "Available memory size (Mo) {512, 1024, 2048, 3072}") long memorySize) {
         return serverUtils.changeMemory(memorySize);
     }
 
@@ -49,16 +49,16 @@ public class ServerCommand implements CommandMarker {
     @CliCommand(value = "open-port", help = "Change java version")
     public String openPort(
             @CliOption(key = {"", "name"}, mandatory = false, help = "Application name") String applicationName,
-            @CliOption(key = {"port"}, mandatory = true, help = "Choose a port to open") String portToOpen,
+            @CliOption(key = {"port"}, mandatory = true, help = "Choose a port to open") int portNumber,
             @CliOption(key = {"nature"}, mandatory = true, help = "Choose a port to open") String portNature) {
-        return serverUtils.openPort(applicationName, portToOpen, portNature);
+        return serverUtils.openPort(applicationName, portNumber, portNature);
     }
 
     @CliCommand(value = "remove-port", help = "Change java version")
     public String openPort(
             @CliOption(key = {"", "name"}, mandatory = false, help = "Application name") String applicationName,
-            @CliOption(key = {"port"}, mandatory = true, help = "Choose a port to open") String portToOpen) {
-        return serverUtils.removePort(applicationName, portToOpen);
+            @CliOption(key = {"port"}, mandatory = true, help = "Choose a port to open") int portNumber) {
+        return serverUtils.removePort(applicationName, portNumber);
     }
 
 }

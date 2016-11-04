@@ -2,19 +2,36 @@ package fr.treeptik.cloudunit.dto;
 
 import java.util.Date;
 
+import javax.validation.constraints.AssertTrue;
+import javax.validation.constraints.NotNull;
+import javax.validation.constraints.Pattern;
+
 import org.springframework.hateoas.ResourceSupport;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonIgnore;
 
 import fr.treeptik.cloudunit.model.Application;
 import fr.treeptik.cloudunit.model.Status;
 
 public class ApplicationResource extends ResourceSupport {
+    @Pattern(regexp = "^[a-z][a-z0-9-]*[a-z0-9]$")
     private String name;
+
+    @Pattern(regexp = ".*\\S.*")
     private String displayName;
+    
     private String domainName;
+    
     private Status status;
+    
     private String deploymentStatus;
+    
+    private String userDisplayName;
+    
+    @NotNull
+    @Pattern(regexp = "^[a-z][a-z0-9-]*[a-z0-9]$")
+    private String serverType;
     
     @JsonFormat(pattern = "YYYY-MM-dd HH:mm")
     private Date creationDate;
@@ -27,6 +44,10 @@ public class ApplicationResource extends ResourceSupport {
         this.domainName = application.getDomainName();
         this.status = application.getStatus();
         this.deploymentStatus = application.getDeploymentStatus();
+        this.creationDate = application.getDate();
+        
+        this.userDisplayName = application.getUser().getDisplayName();
+        this.serverType = application.getServer().getImage().getName();
     }
 
     public String getName() {
@@ -75,5 +96,27 @@ public class ApplicationResource extends ResourceSupport {
 
     public void setCreationDate(Date creationDate) {
         this.creationDate = creationDate;
+    }
+    
+    public String getUserDisplayName() {
+        return userDisplayName;
+    }
+    
+    public void setUserDisplayName(String userDisplayName) {
+        this.userDisplayName = userDisplayName;
+    }
+    
+    public String getServerType() {
+        return serverType;
+    }
+    
+    public void setServerType(String serverType) {
+        this.serverType = serverType;
+    }
+    
+    @JsonIgnore
+    @AssertTrue(message = "One of name or displayName must be suppied")
+    public boolean isNameOrDisplayNameGiven() {
+        return displayName != null || name != null;
     }
 }

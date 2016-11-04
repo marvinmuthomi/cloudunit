@@ -12,7 +12,9 @@ import org.springframework.shell.core.CommandResult;
 import fr.treeptik.cloudunit.cli.integration.AbstractShellIntegrationTest;
 
 public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegrationTest {
-    
+    private static final String KEY = "KEY";
+    private static final String VALUE = "value";
+
     protected AbstractEnvironmentVariablesCommandsIT(String serverType) {
         super(serverType);
     }
@@ -22,11 +24,11 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         connect();
         createApplication();
         try {
-            CommandResult result = createEnvironmentVariable("key", "value");
+            CommandResult result = createEnvironmentVariable(KEY, VALUE);
     
             Assert.assertThat(result, isSuccessfulCommand());
             Assert.assertThat(result.getResult().toString(), containsString("added"));
-            Assert.assertThat(result.getResult().toString(), containsString("key"));
+            Assert.assertThat(result.getResult().toString(), containsString(KEY));
             Assert.assertThat(result.getResult().toString(), containsString(applicationName.toLowerCase()));
         } finally {
             removeApplication();
@@ -39,7 +41,7 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         connect();
         createApplication();
         try {
-            CommandResult result = createEnvironmentVariable("", "value");
+            CommandResult result = createEnvironmentVariable("", VALUE);
             assertThat(result, isFailedCommand());
         } finally {
             removeApplication();
@@ -52,7 +54,7 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         connect();
         createApplication();
         try {
-            CommandResult result = createEnvironmentVariable("azérty", "value");
+            CommandResult result = createEnvironmentVariable("azérty", VALUE);
             
             assertThat(result, isFailedCommand());
         } finally {
@@ -68,14 +70,14 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         try {
             CommandResult result;
             
-            result = createEnvironmentVariable("key", "value");
+            result = createEnvironmentVariable(KEY, VALUE);
             assumeThat(result, isSuccessfulCommand());
             
-            result = removeEnvironmentVariable("key");
+            result = removeEnvironmentVariable(KEY);
             
             assertThat(result, isSuccessfulCommand());
             assertThat(result.getResult().toString(), containsString("removed"));
-            assertThat(result.getResult().toString(), containsString("key"));
+            assertThat(result.getResult().toString(), containsString(KEY));
             assertThat(result.getResult().toString(), containsString(applicationName.toLowerCase()));
         } finally {
             removeApplication();
@@ -90,7 +92,7 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         try {
             CommandResult result;
             
-            result = createEnvironmentVariable("key", "value");
+            result = createEnvironmentVariable(KEY, VALUE);
             assumeThat(result, isSuccessfulCommand());
             
             result = removeEnvironmentVariable("");
@@ -121,9 +123,10 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         connect();
         createApplication();
         try {
-            createEnvironmentVariable("key", "value");
+            createEnvironmentVariable(KEY, VALUE);
             CommandResult result = listEnvironmentVariables();
             
+            assertThat(result, isSuccessfulCommand());
             assertThat(result.getResult().toString(), containsString("1"));
             assertThat(result.getResult().toString(), containsString("found"));
         } finally {
@@ -137,10 +140,12 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         connect();
         createApplication();
         try {
-            createEnvironmentVariable("key", "value");
-            CommandResult result = updateEnvironmentVariable("key", "keyUpdated", "value");
+            createEnvironmentVariable(KEY, VALUE);
+            CommandResult result = updateEnvironmentVariable(KEY, "'new value'");
             
-            String expected = "This environment variable has successful been updated";
+            assertThat(result, isSuccessfulCommand());
+            
+            String expected = "OK";
             assertEquals(expected, result.getResult().toString());
         } finally {
             removeApplication();
@@ -148,12 +153,12 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
     }
 
     @Test
-    public void test_shouldNotUpdateEnvironmentVariableEmptyOldKey() {
+    public void test_shouldNotUpdateEnvironmentVariableEmptyKey() {
         connect();
         createApplication();
         try {
-            createEnvironmentVariable("key", "value");
-            CommandResult result = updateEnvironmentVariable("", "key", "value");
+            createEnvironmentVariable(KEY, VALUE);
+            CommandResult result = updateEnvironmentVariable("", VALUE);
             
             assertThat(result, isFailedCommand());
         } finally {
@@ -162,26 +167,12 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
     }
 
     @Test
-    public void test_shouldNotUpdateEnvironmentVariableEmptyNewKey() {
+    public void test_shouldNotUpdateEnvironmentVariableUnexistingKey() {
         connect();
         createApplication();
         try {
-            createEnvironmentVariable("key", "value");
-            CommandResult result = updateEnvironmentVariable("key", "", "value");
-            
-            assertThat(result, isFailedCommand());
-        } finally {
-            removeApplication();
-        }
-    }
-
-    @Test
-    public void test_shouldNotUpdateEnvironmentVariableUnexistingOldKey() {
-        connect();
-        createApplication();
-        try {
-            createEnvironmentVariable("key", "value");
-            CommandResult result = updateEnvironmentVariable("key2", "key", "value");
+            createEnvironmentVariable(KEY, VALUE);
+            CommandResult result = updateEnvironmentVariable("DZQMOKDZQ", VALUE);
 
             assertThat(result, isFailedCommand());
         } finally {
@@ -197,10 +188,9 @@ public class AbstractEnvironmentVariablesCommandsIT extends AbstractShellIntegra
         return getShell().executeCommand(String.format("rm-var-env --key %s", key));
     }
     
-    private CommandResult updateEnvironmentVariable(String oldKey, String newKey, String value) {
-        return getShell().executeCommand(String.format("update-var-env --old-key %s --new-key %s --value %s",
-                oldKey,
-                newKey,
+    private CommandResult updateEnvironmentVariable(String key, String value) {
+        return getShell().executeCommand(String.format("update-var-env --key %s --value %s",
+                key,
                 value));
     }
     

@@ -26,6 +26,7 @@ import javax.inject.Inject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.context.ApplicationEventPublisher;
+import org.springframework.hateoas.Link;
 import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Controller;
 import org.springframework.transaction.annotation.Transactional;
@@ -90,6 +91,8 @@ public class ServerController {
             
             resource.add(linkTo(methodOn(ApplicationController.class).detail(applicationId))
                     .withRel("application"));
+            
+            resource.add(new Link(server.getManagerLocation(), "manager"));
         } catch (CheckException | ServiceException e) {
             //ignore
         }

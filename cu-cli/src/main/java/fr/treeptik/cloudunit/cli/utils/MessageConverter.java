@@ -15,85 +15,79 @@
 
 package fr.treeptik.cloudunit.cli.utils;
 
-import static java.lang.System.out;
+import static java.lang.System.*;
 
-import java.util.HashMap;
+import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
-import java.util.Map;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import fr.treeptik.cloudunit.cli.model.ModuleAndContainer;
+import fr.treeptik.cloudunit.cli.model.ServerAndContainer;
 import fr.treeptik.cloudunit.dto.AboutResource;
+import fr.treeptik.cloudunit.dto.AliasResource;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
 import fr.treeptik.cloudunit.dto.Command;
 import fr.treeptik.cloudunit.dto.ContainerUnit;
+import fr.treeptik.cloudunit.dto.EnvironmentVariableResource;
 import fr.treeptik.cloudunit.dto.FileUnit;
-import fr.treeptik.cloudunit.model.*;
+import fr.treeptik.cloudunit.dto.ModulePortResource;
+import fr.treeptik.cloudunit.dto.ModuleResource;
+import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.Image;
+import fr.treeptik.cloudunit.model.Message;
+import fr.treeptik.cloudunit.model.Snapshot;
+import fr.treeptik.cloudunit.model.User;
+import fr.treeptik.cloudunit.model.Volume;
 
 public class MessageConverter {
-
     private static ShellRowFormater printer = new ShellRowFormater(out);
-
     private static Logger logger = Logger.getLogger("MessageConverter");
 
-    private static Map<String, String> modulePorts = new HashMap<>();
-
-    public static void buildApplicationMessage(Application application, String dockerManagerIP) {
+    public static void buildApplicationMessage(ApplicationResource application, ServerAndContainer server,
+            Collection<ModuleAndContainer> modules) {
         logger.log(Level.WARNING, "\n GENERAL \n");
 
         printer.print(new String[][] {
-                new String[] { "APPLICATION NAME", "AUTHOR", "STARTING DATE", "SERVER TYPE", "STATUS", "JAVA VERSION" },
-                new String[] { application.getName(),
-                        application.getUser().getLastName() + " " + application.getUser().getFirstName(),
-                        DateUtils.formatDate(application.getDate()),
-                        application.getServer().getImage().getName().toUpperCase(), application.getStatus().toString(),
-                        application.getJvmRelease() },
+                new String[] { "APPLICATION NAME", "AUTHOR", "STARTING DATE", "SERVER TYPE", "STATUS" },
+                new String[] {
+                        application.getName(),
+                        application.getUserDisplayName(),
+                        DateUtils.formatDate(application.getCreationDate()),
+                        application.getServerType(),
+                        application.getStatus().toString()
+                        },
 
         });
 
         logger.log(Level.WARNING, "\n SERVER INFORMATION \n");
 
-        buildServerMessage(application, dockerManagerIP);
-        if (!application.getModules().isEmpty()) {
-            logger.log(Level.WARNING, "\n MODULES INFORMATION \n");
-            buildModuleMessage(application, dockerManagerIP);
-
-        }
-
+        buildServerMessage(server);
+        buildModuleMessage(modules);
     }
 
-    public static void buildGlobalModuleMessage(Application application, String dockerManagerIP) {
-        buildServerMessage(application, dockerManagerIP);
-        if (!application.getModules().isEmpty()) {
-            logger.log(Level.WARNING, "\n AVAILABLE MODULES \n");
-            buildLightModuleMessage(application, dockerManagerIP);
-
-        }
-
-    }
-
-    public static void buildServerMessage(Application application, String dockerManagerIP) {
-
-        Server server = application.getServer();
-
-        String[][] tab = new String[2][7];
-        tab[0][0] = "TYPE";
-        tab[0][1] = "ADDRESS";
-        tab[0][2] = "SSH PORT";
-        tab[0][3] = "STATUS";
-        tab[0][4] = "JVM OPTS";
-        tab[0][5] = "MEMORY";
-        tab[0][6] = "MANAGER LOCATION";
-
-        tab[1][0] = server.getImage().getName().toUpperCase();
-        tab[1][1] = application.getSuffixCloudUnitIO().substring(1);
-        tab[1][2] = server.getSshPort();
-        tab[1][3] = server.getStatus().toString();
-        tab[1][4] = server.getJvmOptions() != "" ? server.getJvmOptions() : "NONE";
-        tab[1][5] = server.getJvmMemory() + "";
-        tab[1][6] = server.getManagerLocation() + " ";
+    public static void buildServerMessage(ServerAndContainer server) {
+        String[][] tab = new String[][] {
+            new String[] {
+                    "TYPE",
+                    "SSH PORT",
+                    "STATUS",
+                    "JVM OPTS",
+                    "MEMORY",
+                    "MANAGER LOCATION",
+            },
+            new String[] {
+                    server.server.getImage().getName(),
+                    server.container.getSshPort(),
+                    server.container.getStatus().toString(),
+                    server.server.getJvmOptions() != "" ? server.server.getJvmOptions() : "NONE",
+                    server.server.getJvmMemory().toString(),
+                    server.server.getLink("manager").getHref(),
+            },
+        };
 
         printer.print(tab);
-
     }
 
     public static void buildImageResponse(Image image) {
@@ -124,117 +118,53 @@ public class MessageConverter {
         printer.print(tab);
     }
 
-    public static void buildModuleMessage(Application application, String dockerManagerIP) {
-
-        modulePorts.put("mysql-5-5", "3306");
-        modulePorts.put("postgresql-9-3", "5432");
-
-        List<Module> modules = application.getModules();
-        if (modules.size() < 1) {
-            logger.log(Level.WARNING, "No modules found!");
-        } else {
-
-            for (Module module : modules) {
-
-                int moduleIndex = 0;
-
-                String[][] tab = new String[4][2];
-
-                tab[0][0] = "MODULE NAME";
-                tab[1][0] = "TYPE";
-                tab[2][0] = "DOMAIN NAME";
-                tab[3][0] = "PORTS";
-
-                if (!module.getImage().getImageType().equalsIgnoreCase(Image.MODULE)) {
-                    continue;
-                }
-
-                int indexName = module.getName().indexOf(application.getName());
-                // #POINTDROGUE
-                tab[0][moduleIndex + 1] = module.getName().substring(indexName + application.getName().length() + 1);
-                tab[1][moduleIndex + 1] = module.getImage().getName();
-                tab[2][moduleIndex + 1] = module.getInternalDNSName();
-                StringBuilder builder = new StringBuilder();
-                module.getPorts().stream().forEach(p -> {
-                    builder.append(p.getPortType())
-                            .append(" port : ")
-                            .append(p.getContainerValue())
-                            .append(p.getHostValue() == null ? " Non exposed" : String.format(" on %s", p.getHostValue()))
-                            .append(" | ");
-                });
-                tab[3][moduleIndex + 1] = builder.toString();
-                moduleIndex++;
-
-                printer.print(tab);
-
-                logger.log(Level.WARNING, " ");
-
-            }
-
+    public static void buildModuleMessage(Collection<ModuleAndContainer> modules) {
+        List<String[]> tabs = new ArrayList<>();
+        
+        tabs.add(new String[] { "MODULE NAME", "DOMAIN NAME", "PORTS", });
+        
+        for (ModuleAndContainer module : modules) {
+            tabs.add(new String[] {
+                    module.module.getName(),
+                    module.container.getInternalDnsName(),
+                    String.join(" ", module.ports.stream().map(p -> buildPortMessage(p)).toArray(String[]::new)),
+            });
         }
+        
+        printer.print(tabs.toArray(new String[0][]));
+    }
+    
+    public static String buildPortMessage(ModulePortResource port) {
+        return String.format("%s->%s",
+                port.getNumber(),
+                port.getHostNumber() != null ? port.getHostNumber() : "x");
     }
 
-    public static void buildLightModuleMessage(Application application, String dockerManagerIP) {
-
-        List<Module> modules = application.getModules();
-        if (modules.size() < 1) {
-            logger.log(Level.WARNING, "No modules found!");
-        } else {
-
-            for (Module module : modules) {
-
-                int moduleIndex = 0;
-
-                String[][] tab = new String[2][2];
-
-                tab[0][0] = "MODULE NAME";
-                tab[1][0] = "TYPE";
-
-                if (!module.getImage().getImageType().equalsIgnoreCase(Image.MODULE)) {
-                    continue;
-                }
-
-                int indexName = module.getName().indexOf(application.getName());
-                // #POINTDROGUE
-                tab[0][moduleIndex + 1] = module.getName().substring(indexName + application.getName().length() + 1);
-                tab[1][moduleIndex + 1] = module.getImage().getName();
-
-                moduleIndex++;
-
-                printer.print(tab);
-
-                logger.log(Level.WARNING, " ");
-
-            }
-
-        }
+    public static void buildLightModuleMessage(Collection<ModuleResource> modules) {
+        printer.print(new String[][] { modules.stream().map(m -> m.getName()).toArray(String[]::new) });
     }
 
-    public static void buildListApplications(List<Application> apps) {
-        if (apps.isEmpty()) {
-            logger.log(Level.WARNING, "No apps found!");
-        } else {
-
-            String[][] tab = new String[apps.size() + 1][5];
-            tab[0][0] = "APPLICATION NAME";
-            tab[0][1] = "AUTHOR";
-            tab[0][2] = "STARTING DATE";
-            tab[0][3] = "SERVER TYPE";
-            tab[0][4] = "STATUS";
-
-            Application application = null;
-            for (int i = 0; i < apps.size(); i++) {
-                application = apps.get(i);
-
-                tab[i + 1][0] = application.getName();
-                tab[i + 1][1] = application.getUser().getLastName() + " " + application.getUser().getFirstName();
-                tab[i + 1][2] = DateUtils.formatDate(application.getDate());
-                tab[i + 1][3] = application.getServer().getImage().getName();
-                tab[i + 1][4] = application.getStatus().name();
-            }
-            printer.print(tab);
-
+    public static void buildListApplications(Collection<ApplicationResource> appications) {
+        List<String[]> tab = new ArrayList<>();
+        
+        tab.add(new String[] {
+                "APPLICATION NAME",
+                "AUTHOR",
+                "STARTING DATE",
+                "SERVER TYPE",
+                "STATUS",
+        });
+        
+        for (ApplicationResource application : appications) {
+            tab.add(new String [] {
+                    application.getName(),
+                    application.getUserDisplayName(),
+                    DateUtils.formatDate(application.getCreationDate()),
+                    application.getServerType(),
+                    application.getStatus().name(),
+            });
         }
+        printer.print(tab.toArray(new String[0][]));
     }
 
     public static void buildListUsers(List<User> users) {
@@ -341,34 +271,24 @@ public class MessageConverter {
 
     }
 
-    public static void buildListAliases(List<String> aliases) {
-        String[][] tab = new String[aliases.size() + 1][1];
-        tab[0][0] = "CURRENT ALIASES";
-
-        if (aliases.size() == 0) {
-            logger.log(Level.INFO, "This application has not custom aliases");
-        } else {
-            for (int i = 0; i < aliases.size(); i++) {
-                tab[i + 1][0] = aliases.get(i);
-            }
-            printer.print(tab);
-        }
+    public static void buildListAliases(Collection<AliasResource> aliases) {
+        printer.print(new String[][] { aliases.stream().map(a -> a.getName()).toArray(String[]::new) });
     }
 
-    public static void buildListEnvironmentVariables(List<EnvironmentVariable> environmentVariables) {
-        String[][] tab = new String[environmentVariables.size() + 1][2];
-        tab[0][0] = "CURRENT ENVIRONMENT VARIABLES";
-        tab[0][1] = "VALUES";
+    public static void buildListEnvironmentVariables(Collection<EnvironmentVariableResource> environmentVariables) {
+        List<String[]> tab = new ArrayList<>();
+        tab.add(new String[] {
+                "ENVIRONMENT VARIABLE",
+                "VALUE",
+        });
 
-        if (environmentVariables.size() == 0) {
-            logger.log(Level.INFO, "This application has not custom environment variable");
-        } else {
-            for (int i = 0; i < environmentVariables.size(); i++) {
-                tab[i + 1][0] = environmentVariables.get(i).getKeyEnv();
-                tab[i + 1][1] = environmentVariables.get(i).getValueEnv();
-            }
-            printer.print(tab);
+        for (EnvironmentVariableResource variable : environmentVariables) {
+            tab.add(new String[] {
+                    variable.getName(),
+                    variable.getValue(),
+            });
         }
+        printer.print(tab.toArray(new String[0][]));
     }
 
     public static String buildListVolumes(List<Volume> volumes) {

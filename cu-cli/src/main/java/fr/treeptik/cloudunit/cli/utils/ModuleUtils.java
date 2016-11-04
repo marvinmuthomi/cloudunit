@@ -16,32 +16,37 @@
 package fr.treeptik.cloudunit.cli.utils;
 
 import java.io.File;
+import java.io.IOException;
 import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Logger;
 
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.core.io.FileSystemResource;
+import org.springframework.hateoas.Resources;
 import org.springframework.stereotype.Component;
 
+import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.ObjectMapper;
+
 import fr.treeptik.cloudunit.cli.CloudUnitCliException;
-import fr.treeptik.cloudunit.cli.Guard;
 import fr.treeptik.cloudunit.cli.Messages;
-import fr.treeptik.cloudunit.cli.commands.ShellStatusCommand;
 import fr.treeptik.cloudunit.cli.exception.ManagerResponseException;
 import fr.treeptik.cloudunit.cli.processor.InjectLogger;
 import fr.treeptik.cloudunit.cli.rest.RestUtils;
-import fr.treeptik.cloudunit.model.Module;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ContainerResource;
+import fr.treeptik.cloudunit.dto.ModulePortResource;
+import fr.treeptik.cloudunit.dto.ModuleResource;
 
 @Component
 public class ModuleUtils {
     private static final String MODULES_COUNT = Messages.getString("module.MODULES_COUNT");
     private static final String MODULE_REMOVED = Messages.getString("module.MODULE_REMOVED");
     private static final String MODULE_ADDED = Messages.getString("module.MODULE_ADDED");
-    private static final String NO_MODULES = Messages.getString("module.NO_MODULES");
     private static final String NO_SUCH_MODULE = Messages.getString("module.NO_SUCH_MODULE");
+    private static final String NO_SUCH_PORT = Messages.getString("module.NO_SUCH_PORT");
 
     @Autowired
     private ApplicationUtils applicationUtils;
@@ -52,60 +57,102 @@ public class ModuleUtils {
     @Autowired
     private CheckUtils checkUtils;
 
-    @Autowired
-    private UrlLoader urlLoader;
-
     @InjectLogger
     private Logger log;
 
     @Autowired
-    private ShellStatusCommand statusCommand;
-
-    @Autowired
     private RestUtils restUtils;
+    
+    private final ObjectMapper objectMapper = new ObjectMapper();
+    
+    public Resources<ModuleResource> getModules(ApplicationResource application) {
+        String url = application.getLink("modules").getHref();
+        
+        try {
+            String response = restUtils.sendGetCommand(url, authenticationUtils.getMap()).get("body");
+            
+            return objectMapper.readValue(response, new TypeReference<Resources<ModuleResource>>() {});
+        } catch (ManagerResponseException | IOException e) {
+            throw new CloudUnitCliException("Couldn't get modules", e);
+        }
+    }
+    
+    public ModuleResource getModule(ApplicationResource application, String moduleName) {
+        return getModules(application).getContent().stream()
+                .filter(m -> m.getName().equals(moduleName))
+                .findAny()
+                .orElseThrow(() -> new CloudUnitCliException(MessageFormat.format(NO_SUCH_MODULE, application.getName(), moduleName)));
+    }
+    
+    public ContainerResource getModuleContainer(ModuleResource module) {
+        String url = module.getLink("container").getHref();
+        
+        try {
+            String response = restUtils.sendGetCommand(url, authenticationUtils.getMap()).get("body");
+            return objectMapper.readValue(response, ContainerResource.class);
+        } catch (ManagerResponseException | IOException e) {
+            throw new CloudUnitCliException("Couldn't get module container", e);
+        }
+    }
+    
+    public Resources<ModulePortResource> getModulePorts(ModuleResource module) {
+        String url = module.getLink("ports").getHref();
+        
+        try {
+            String response = restUtils.sendGetCommand(url, authenticationUtils.getMap()).get("body");
+            return objectMapper.readValue(response, new TypeReference<Resources<ModulePortResource>>() {});
+        } catch (ManagerResponseException | IOException e) {
+            throw new CloudUnitCliException("Couldn't get module ports", e);
+        }
+    }
+    
+    public ModulePortResource getModulePort(ModuleResource module, String portNumber) {
+        return getModulePorts(module).getContent().stream()
+                .filter(p -> p.getNumber().equals(portNumber))
+                .findAny()
+                .orElseThrow(() -> new CloudUnitCliException(MessageFormat.format(NO_SUCH_PORT, portNumber)));
+    }
 
     public String getListModules() {
         applicationUtils.checkConnectedAndApplicationSelected();
         
-        String dockerManagerIP = applicationUtils.getCurrentApplication().getManagerIp();
-        statusCommand.setExitStatut(0);
-        MessageConverter.buildLightModuleMessage(applicationUtils.getCurrentApplication(), dockerManagerIP);
+        Resources<ModuleResource> modules = getModules(applicationUtils.getCurrentApplication());
+        MessageConverter.buildLightModuleMessage(modules.getContent());
 
-        int size = applicationUtils.getCurrentApplication().getModules().size();
-        return MessageFormat.format(MODULES_COUNT, size);
+        return MessageFormat.format(MODULES_COUNT, modules.getContent().size());
     }
 
-    public String addModule(final String imageName, final File script) {
+    public String addModule(String imageName, File script) {
         applicationUtils.checkConnectedAndApplicationSelected();
         
         checkUtils.checkImageExists(imageName);
         
-        Map<String, String> parameters = new HashMap<>();
-        parameters.put("imageName", imageName);
-        parameters.put("applicationName", applicationUtils.getCurrentApplication().getName());
+        ApplicationResource currentApplication = applicationUtils.getCurrentApplication();
+        String url = currentApplication.getLink("modules").getHref();
+        ModuleResource request = new ModuleResource();
+        request.setName(imageName);
         
         try {
-            restUtils.sendPostCommand(authenticationUtils.finalHost + urlLoader.modulePrefix,
-                    authenticationUtils.getMap(), parameters).get("body");
-        } catch (ManagerResponseException e) {
+            String response = restUtils.sendPostCommand(url, authenticationUtils.getMap(), request);
+            ModuleResource result = objectMapper.readValue(response, ModuleResource.class);
+            
+            return MessageFormat.format(MODULE_ADDED,
+                    result.getName(),
+                    currentApplication.getName());
+
+        } catch (ManagerResponseException | IOException e) {
             throw new CloudUnitCliException("Couldn't add module", e);
-        }
-        
-        return MessageFormat.format(MODULE_ADDED,
-                imageName,
-                applicationUtils.getCurrentApplication().getName());
+        }        
     }
 
     public String removeModule(String moduleName) {
         applicationUtils.checkConnectedAndApplicationSelected();
 
-        Module module = findModule(moduleName);
+        ModuleResource module = getModule(applicationUtils.getCurrentApplication(), moduleName);
         
+        String url = module.getId().getHref();
         try {
-            restUtils.sendDeleteCommand(
-                    authenticationUtils.finalHost + urlLoader.modulePrefix
-                            + applicationUtils.getCurrentApplication().getName() + "/" + module.getName(),
-                    authenticationUtils.getMap()).get("body");
+            restUtils.sendDeleteCommand(url, authenticationUtils.getMap());
         } catch (ManagerResponseException e) {
             throw new CloudUnitCliException("Couldn't remove module", e);
         }
@@ -115,35 +162,17 @@ public class ModuleUtils {
                 applicationUtils.getCurrentApplication().getName());
     }
 
-    private Module findModule(String moduleName) {
-        Guard.guardTrue(!applicationUtils.getCurrentApplication().getModules().isEmpty(), NO_MODULES,
-                applicationUtils.getCurrentApplication().getName());
-        
-        Optional<Module> module = applicationUtils.getCurrentApplication().getModules().stream()
-                .filter(m -> m.getName().endsWith(moduleName))
-                .findAny();
-        
-        Guard.guardTrue(module.isPresent(), NO_SUCH_MODULE,
-                applicationUtils.getCurrentApplication().getName(),
-                moduleName);
-        
-        return module.get();
-    }
-
-    public String managePort(String moduleName, final String port, final Boolean open) {
+    public String managePort(String moduleName, String portNumber, boolean open) {
         applicationUtils.checkConnectedAndApplicationSelected();
         
-        Module module = findModule(moduleName);
+        ModuleResource module = getModule(applicationUtils.getCurrentApplication(), moduleName);
+        ModulePortResource port = getModulePort(module, portNumber);
+        
+        port.setPublishPort(open);
+        
+        String url = port.getId().getHref();
         try {
-            restUtils.sendPutCommand(
-                    authenticationUtils.finalHost + urlLoader.modulePrefix + "/" + module.getId(),
-                    authenticationUtils.getMap(), new HashMap<String, String>() {
-                        private static final long serialVersionUID = 1L;
-                        {
-                            put("publishPort", open.toString());
-                            put("port", port);
-                        }
-                    }).get("body");
+            restUtils.sendPutCommand(url, authenticationUtils.getMap(), port);
         } catch (ManagerResponseException e) {
             throw new CloudUnitCliException("Couldn't change port", e);
         }
@@ -154,16 +183,13 @@ public class ModuleUtils {
     public String runScript(String moduleName, File file) {
         applicationUtils.checkConnectedAndApplicationSelected();
         
-        Module module = findModule(moduleName);
+        ModuleResource module = getModule(applicationUtils.getCurrentApplication(), moduleName);
         
         Map<String, Object> parameters = new HashMap<>();
         parameters.put("file", new FileSystemResource(file));
         parameters.putAll(authenticationUtils.getMap());
         
-        String url = String.format("%s%s%s/run-script",
-            authenticationUtils.finalHost,
-            urlLoader.modulePrefix,
-            module.getName());
+        String url = module.getLink("run-script").getHref();
         
         log.info("Running script...");
         

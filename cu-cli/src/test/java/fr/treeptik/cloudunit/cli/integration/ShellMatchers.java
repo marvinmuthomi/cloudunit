@@ -36,9 +36,15 @@ public class ShellMatchers {
             mismatchDescription.appendText("was ");
             mismatchDescription.appendText(item.isSuccess() ? "success" : "failure");
             mismatchDescription.appendText(" [");
-            mismatchDescription.appendText(item.isSuccess()
-                    ? item.getResult().toString()
-                    : item.getException().getMessage());
+            
+            mismatchDescription.appendValue(item.isSuccess() ? item.getResult() : item.getException());
+//            String message = "";
+//            if (item.isSuccess() && item.getResult() != null) {
+//                message = item.getResult().toString();
+//            } else if (!item.isSuccess() && item.getException() != null) {
+//                message = item.getException().toString();
+//            }
+//            mismatchDescription.appendText(message);
             mismatchDescription.appendText("]");
         }
 

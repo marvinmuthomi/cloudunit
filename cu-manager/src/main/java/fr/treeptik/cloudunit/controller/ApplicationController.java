@@ -46,7 +46,6 @@ import fr.treeptik.cloudunit.config.events.ApplicationPendingEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStartEvent;
 import fr.treeptik.cloudunit.config.events.ApplicationStopEvent;
 import fr.treeptik.cloudunit.dto.AliasResource;
-import fr.treeptik.cloudunit.dto.ApplicationCreationRequest;
 import fr.treeptik.cloudunit.dto.ApplicationResource;
 import fr.treeptik.cloudunit.dto.PortResource;
 import fr.treeptik.cloudunit.exception.CheckException;
@@ -79,35 +78,39 @@ public class ApplicationController {
 
     private ApplicationResource buildResource(Application application) {
         ApplicationResource resource = new ApplicationResource(application);
-        
+
+        Integer applicationId = application.getId();
         try {
-            resource.add(linkTo(methodOn(ApplicationController.class).detail(application.getId()))
+            resource.add(linkTo(methodOn(ApplicationController.class).detail(applicationId))
                     .withSelfRel());
             
-            resource.add(linkTo(methodOn(ServerController.class).getServer(application.getId()))
+            resource.add(linkTo(methodOn(ContainerController.class).getContainers(applicationId))
+                    .withRel("containers"));
+            
+            resource.add(linkTo(methodOn(ServerController.class).getServer(applicationId))
                     .withRel("server"));
             
-            resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(application.getId()))
+            resource.add(linkTo(methodOn(DeploymentController.class).getDeployments(applicationId))
                     .withRel("deployments"));
                         
-            resource.add(linkTo(methodOn(ApplicationController.class).aliases(application.getId()))
+            resource.add(linkTo(methodOn(ApplicationController.class).aliases(applicationId))
                     .withRel("aliases"));
             
-            resource.add(linkTo(methodOn(ModuleController.class).getModules(application.getId()))
+            resource.add(linkTo(methodOn(ModuleController.class).getModules(applicationId))
                     .withRel("modules"));
             
-            resource.add(linkTo(methodOn(ApplicationController.class).getPorts(application.getId()))
+            resource.add(linkTo(methodOn(ApplicationController.class).getPorts(applicationId))
                     .withRel("ports"));
             
             if (EnumSet.of(Status.START, Status.STOP).contains(application.getStatus())) {
-                resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(application.getId()))
+                resource.add(linkTo(methodOn(ApplicationController.class).restartApplication(applicationId))
                         .withRel("restart"));
                 
                 if (application.getStatus() == Status.START) {
-                    resource.add(linkTo(methodOn(ApplicationController.class).stopApplication(application.getId()))
+                    resource.add(linkTo(methodOn(ApplicationController.class).stopApplication(applicationId))
                             .withRel("stop"));
                 } else {
-                    resource.add(linkTo(methodOn(ApplicationController.class).startApplication(application.getId()))
+                    resource.add(linkTo(methodOn(ApplicationController.class).startApplication(applicationId))
                             .withRel("start"));
                 }
             }
@@ -128,7 +131,7 @@ public class ApplicationController {
 	 * @throws InterruptedException
 	 */
 	@RequestMapping(method = RequestMethod.POST)
-	public ResponseEntity<?> createApplication(@Valid @RequestBody ApplicationCreationRequest request)
+	public ResponseEntity<?> createApplication(@Valid @RequestBody ApplicationResource request)
 			throws ServiceException, CheckException, InterruptedException {
 		// We must be sure there is no running action before starting new one
 		User user = authentificationUtils.getAuthentificatedUser();
@@ -483,8 +486,7 @@ public class ApplicationController {
             
             resource.add(new Link(port.getAlias(), "open"));
         } catch (CheckException | ServiceException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
+            // ignore
         }
 	    
 	    return resource;

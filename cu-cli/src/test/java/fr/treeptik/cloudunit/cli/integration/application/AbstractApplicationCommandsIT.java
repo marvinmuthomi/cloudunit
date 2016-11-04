@@ -294,6 +294,7 @@ public abstract class AbstractApplicationCommandsIT extends AbstractShellIntegra
         try {
             CommandResult result = listApplications();
             
+            assertThat(result, isSuccessfulCommand());
             assertThat(result.getResult().toString(), containsString("found"));
         } finally {
             removeApplication();

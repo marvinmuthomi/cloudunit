@@ -15,7 +15,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 
-public class ApplicationCreationRequestValidationTest {
+public class ApplicationResourceValidationTest {
     private Validator validator;
 
     @Before
@@ -28,55 +28,55 @@ public class ApplicationCreationRequestValidationTest {
     
     @Test
     public void test_okNullDisplayName() {
-        ApplicationCreationRequest request = new ApplicationCreationRequest();
+        ApplicationResource request = new ApplicationResource();
         request.setServerType("tomcat-8");
         request.setName("app-09");
         
-        Set<ConstraintViolation<ApplicationCreationRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<ApplicationResource>> violations = validator.validate(request);
         
         assertThat(violations, empty());
     }
     
     @Test
     public void test_okNullName() {
-        ApplicationCreationRequest request = new ApplicationCreationRequest();
+        ApplicationResource request = new ApplicationResource();
         request.setServerType("tomcat-8");
         request.setDisplayName("App 09");
         
-        Set<ConstraintViolation<ApplicationCreationRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<ApplicationResource>> violations = validator.validate(request);
         
         assertThat(violations, empty());
     }
     
     @Test
     public void test_koBlankDisplayName() {
-        ApplicationCreationRequest request = new ApplicationCreationRequest();
+        ApplicationResource request = new ApplicationResource();
         request.setServerType("tomcat-8");
         request.setDisplayName("    ");
         
-        Set<ConstraintViolation<ApplicationCreationRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<ApplicationResource>> violations = validator.validate(request);
         
         assertThat(violations, not(empty()));
     }
     
     @Test
     public void test_koBlankName() {
-        ApplicationCreationRequest request = new ApplicationCreationRequest();
+        ApplicationResource request = new ApplicationResource();
         request.setServerType("tomcat-8");
         request.setName("    ");
         
-        Set<ConstraintViolation<ApplicationCreationRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<ApplicationResource>> violations = validator.validate(request);
         
         assertThat(violations, not(empty()));
     }
     
     @Test
     public void test_koUpperCaseName() {
-        ApplicationCreationRequest request = new ApplicationCreationRequest();
+        ApplicationResource request = new ApplicationResource();
         request.setServerType("tomcat-8");
         request.setName("APP-09");
         
-        Set<ConstraintViolation<ApplicationCreationRequest>> violations = validator.validate(request);
+        Set<ConstraintViolation<ApplicationResource>> violations = validator.validate(request);
         
         assertThat(violations, not(empty()));
     }

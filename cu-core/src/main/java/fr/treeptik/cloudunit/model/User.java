@@ -14,6 +14,7 @@ package fr.treeptik.cloudunit.model;/*
 									*/
 
 import java.io.Serializable;
+import java.text.MessageFormat;
 import java.util.Date;
 import java.util.List;
 
@@ -242,5 +243,9 @@ public class User implements Serializable {
 			return false;
 		return true;
 	}
+
+    public String getDisplayName() {
+        return MessageFormat.format("{0} {1}", firstName, lastName);
+    }
 
 }

@@ -13,13 +13,18 @@ public class ModuleResource extends ResourceSupport {
     @Pattern(regexp = "[a-z][a-z0-9-]*")
     @Size(max = 64)
     private String name;
+    
     private String displayName;
+    
+    private ImageResource image;
     
     public ModuleResource() {}
     
     public ModuleResource(Module module) {
         this.name = module.getImage().getName();
         this.displayName = module.getImage().getDisplayName();
+        
+        this.image = new ImageResource(module.getImage());
     }
     
     public void setName(String name) {
@@ -36,5 +41,13 @@ public class ModuleResource extends ResourceSupport {
     
     public String getDisplayName() {
         return displayName;
+    }
+    
+    public ImageResource getImage() {
+        return image;
+    }
+    
+    public void setImage(ImageResource image) {
+        this.image = image;
     }
 }

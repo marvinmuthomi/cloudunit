@@ -144,7 +144,7 @@ public abstract class AbstractAliasesCommandsIT extends AbstractShellIntegration
             assertThat(result.getResult().toString(), containsString(ALIAS));
             
             result = listAliases();
-            assertThat(result.getResult().toString(), containsString("1 alias found"));
+            assertThat(result.getResult().toString(), containsString("No aliases found"));
         } finally {
             removeApplication();
             disconnect();

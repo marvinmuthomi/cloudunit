@@ -30,6 +30,7 @@ import org.apache.http.client.entity.UrlEncodedFormEntity;
 import org.apache.http.client.methods.CloseableHttpResponse;
 import org.apache.http.client.methods.HttpDelete;
 import org.apache.http.client.methods.HttpGet;
+import org.apache.http.client.methods.HttpPatch;
 import org.apache.http.client.methods.HttpPost;
 import org.apache.http.client.methods.HttpPut;
 import org.apache.http.client.protocol.HttpClientContext;
@@ -179,12 +180,12 @@ public class RestUtils {
      * @return
      * @throws ClientProtocolException
      */
-    public Map<String, Object> sendPostCommand(String url, Map<String, Object> credentials,
-            Map<String, String> parameters) throws ManagerResponseException {
+    public String sendPostCommand(String url, Map<String, Object> credentials,
+            Object entity) throws ManagerResponseException {
         try {
             ObjectMapper mapper = new ObjectMapper();
-            String entity = mapper.writeValueAsString(parameters);
-            return sendPostCommand(url, credentials, entity);
+            String body = mapper.writeValueAsString(entity);
+            return sendPostCommand(url, credentials, body);
         } catch (Exception e) {
             throw new ManagerResponseException(e.getMessage(), e);
         }
@@ -199,20 +200,20 @@ public class RestUtils {
      * @return
      * @throws ClientProtocolException
      */
-    public Map<String, Object> sendPostCommand(String url, Map<String, Object> credentials, String entity)
+    public String sendPostCommand(String url, Map<String, Object> credentials, String entity)
             throws ManagerResponseException {
-        Map<String, Object> response = new HashMap<String, Object>();
         CloseableHttpClient httpclient = HttpClients.createDefault();
         HttpPost httpPost = new HttpPost(url);
         httpPost.setHeader("Accept", "application/json");
         httpPost.setHeader("Content-type", "application/json");
+
+        String response = null;
         try {
             StringEntity stringEntity = new StringEntity(entity);
             httpPost.setEntity(stringEntity);
             CloseableHttpResponse httpResponse = httpclient.execute(httpPost, localContext);
             ResponseHandler<String> handler = new CustomResponseErrorHandler();
-            String body = handler.handleResponse(httpResponse);
-            response.put(BODY, body);
+            response = handler.handleResponse(httpResponse);
             httpResponse.close();
         } catch (Exception e) {
             throw new ManagerResponseException(e.getMessage(), e);
@@ -230,7 +231,7 @@ public class RestUtils {
      * @throws ClientProtocolException
      */
     public Map<String, Object> sendPutCommand(String url, Map<String, Object> credentials,
-            Map<String, String> parameters) throws ManagerResponseException {
+            Object parameters) throws ManagerResponseException {
         Map<String, Object> response = new HashMap<String, Object>();
         CloseableHttpClient httpclient = HttpClients.createDefault();
 
@@ -254,6 +255,39 @@ public class RestUtils {
 
         return response;
     }
+    
+    /**
+     * sendPutCommand
+     *
+     * @param url
+     * @param parameters
+     * @return
+     * @throws ClientProtocolException
+     */
+    public String sendPatchCommand(String url, Map<String, Object> credentials, Object parameters)
+            throws ManagerResponseException {
+        CloseableHttpClient httpclient = HttpClients.createDefault();
+
+        HttpPatch httpPatch = new HttpPatch(url);
+        httpPatch.setHeader("Accept", "application/json");
+        httpPatch.setHeader("Content-type", "application/json");
+
+        try {
+            ObjectMapper mapper = new ObjectMapper();
+            StringEntity entity = new StringEntity(mapper.writeValueAsString(parameters));
+            httpPatch.setEntity(entity);
+            CloseableHttpResponse httpResponse = httpclient.execute(httpPatch, localContext);
+            ResponseHandler<String> handler = new CustomResponseErrorHandler();
+            String response = handler.handleResponse(httpResponse);
+            
+            httpResponse.close();
+            
+            return response;
+        } catch (Exception e) {
+            throw new ManagerResponseException(e.getMessage(), e);
+        }
+    }
+
 
     /**
      * 

@@ -70,7 +70,7 @@ public class SnapshotUtils {
 
 		try {
 			restUtils.sendPostCommand(authentificationUtils.finalHost + "/snapshot", authentificationUtils.getMap(),
-					parameters).get("body");
+					parameters);
 		} catch (ManagerResponseException e) {
 			statusCommand.setExitStatut(1);
 			return ANSIConstants.ANSI_RED + e.getMessage() + ANSIConstants.ANSI_RESET;
@@ -153,7 +153,7 @@ public class SnapshotUtils {
 		parameters.put("tag", tag);
 		try {
 			restUtils.sendPostCommand(authentificationUtils.finalHost + "/snapshot/clone",
-					authentificationUtils.getMap(), parameters).get("body");
+					authentificationUtils.getMap(), parameters);
 		} catch (ManagerResponseException e) {
 			statusCommand.setExitStatut(1);
 			return ANSIConstants.ANSI_RED + e.getMessage() + ANSIConstants.ANSI_RESET;

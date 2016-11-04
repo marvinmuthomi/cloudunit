@@ -11,7 +11,7 @@ import org.springframework.shell.core.JLineShellComponent;
 /**
  * Created by guillaume on 15/10/15.
  */
-public class AbstractShellIntegrationTest {
+public abstract class AbstractShellIntegrationTest {
     public static final String TEST_USER = "johndoe";
     public static final String TEST_PASSWORD = "abc2015";
 
@@ -30,7 +30,7 @@ public class AbstractShellIntegrationTest {
 
     @Before
     public void startUp() throws InterruptedException {
-        applicationName = "App" + new Random().nextInt(10000);
+        applicationName = "app" + new Random().nextInt(10000);
         
         Bootstrap bootstrap = new Bootstrap();
         shell = bootstrap.getJLineShellComponent();
@@ -82,7 +82,7 @@ public class AbstractShellIntegrationTest {
     }
 
     protected CommandResult displayModules() {
-        return getShell().executeCommand("display-modules");
+        return getShell().executeCommand("list-modules");
     }
 
     protected CommandResult disconnect() {

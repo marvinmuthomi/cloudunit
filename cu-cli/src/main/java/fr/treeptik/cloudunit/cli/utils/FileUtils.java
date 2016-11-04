@@ -22,7 +22,6 @@ import java.text.MessageFormat;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -38,14 +37,12 @@ import fr.treeptik.cloudunit.cli.exception.ManagerResponseException;
 import fr.treeptik.cloudunit.cli.processor.InjectLogger;
 import fr.treeptik.cloudunit.cli.rest.JsonConverter;
 import fr.treeptik.cloudunit.cli.rest.RestUtils;
+import fr.treeptik.cloudunit.dto.ApplicationResource;
+import fr.treeptik.cloudunit.dto.ContainerResource;
 import fr.treeptik.cloudunit.dto.FileUnit;
-import fr.treeptik.cloudunit.model.Application;
-import fr.treeptik.cloudunit.model.Module;
-import fr.treeptik.cloudunit.model.Server;
 
 @Component
 public class FileUtils {
-    private static final String NO_SUCH_CONTAINER = "No such container \"{0}\". Available containers are\n{1}";
     private static final String NOT_IN_EXPLORER = Messages.getString("file.NOT_IN_EXPLORER");
     private static final String IN_EXPLORER = Messages.getString("file.IN_EXPLORER");
 
@@ -64,16 +61,16 @@ public class FileUtils {
 	@Autowired
 	private ApplicationUtils applicationUtils;
 
-	private String currentContainerId;
+	private ContainerResource currentContainer;
 
 	private String currentPath;
 	
-	public String getCurrentContainerName() {
-        return currentContainerId;
+	public ContainerResource getCurrentContainerName() {
+        return currentContainer;
     }
 
     public boolean isInFileExplorer() {
-        return currentContainerId != null;
+        return currentContainer != null;
     }
     
     public void checkInFileExplorer() {
@@ -93,7 +90,7 @@ public class FileUtils {
     public String createDirectory(String path) {
         checkConnectedAndInFileExplorer();
         
-        String url = authentificationUtils.finalHost + "/file/container/" + currentContainerId
+        String url = authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId()
                 + "/application/" + applicationUtils.getCurrentApplication().getName();
         try {
             restUtils.sendPostCommand(url + "?path=" + path, authentificationUtils.getMap(), "");
@@ -106,25 +103,10 @@ public class FileUtils {
     public String openExplorer(String containerName) {
         applicationUtils.checkConnectedAndApplicationSelected();
         
-		Application application = applicationUtils.getCurrentApplication();
+		ApplicationResource application = applicationUtils.getCurrentApplication();
 		
-		Server server = application.getServer();
-		if (server.getName().equalsIgnoreCase(containerName)) {
-			currentContainerId = server.getContainerID();
-		} else {
-		    Optional<Module> module = application.getModules().stream()
-		        .filter(m -> m.getName().equalsIgnoreCase(containerName))
-		        .findAny();
-		    
-		    if (!module.isPresent()) {
-		        throw new CloudUnitCliException(MessageFormat.format(NO_SUCH_CONTAINER,
-		                containerName,
-		                getAvailableContainerNames()));
-		    }
-		    
-		    currentContainerId = module.get().getContainerID();
-		}
-
+		currentContainer = applicationUtils.getContainer(application, containerName);
+		
 		currentPath = "/";
 		return "Explorer opened";
 	}
@@ -138,7 +120,7 @@ public class FileUtils {
 	public String closeExplorer() throws ManagerResponseException {
         checkConnectedAndInFileExplorer();
 	        
-		currentContainerId = null;
+		currentContainer = null;
 		currentPath = null;
 		
 		return "Explorer closed";
@@ -153,7 +135,7 @@ public class FileUtils {
 	public String listFiles() throws ManagerResponseException {
         checkConnectedAndInFileExplorer();
 	    
-		String url = authentificationUtils.finalHost + "/file/container/" + currentContainerId + "?path="+ currentPath;
+		String url = authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId() + "?path="+ currentPath;
 		String json = restUtils.sendGetCommand(url, authentificationUtils.getMap()).get("body");
 
 		String result = MessageConverter.buildListFileUnit(JsonConverter.getFileUnits(json));
@@ -170,7 +152,7 @@ public class FileUtils {
 	public String changeDirectory(String directoryName) throws ManagerResponseException {
         checkConnectedAndInFileExplorer();
 	    
-		String url = authentificationUtils.finalHost + "/file/container/" + currentContainerId + "?path=" + currentPath;
+		String url = authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId() + "?path=" + currentPath;
 		String json = restUtils.sendGetCommand(url, authentificationUtils.getMap()).get("body");
 		JsonConverter.getFileUnits(json);
 		currentPath = directoryName;
@@ -189,7 +171,7 @@ public class FileUtils {
 	    
         String currentPath = fileName.substring(0, fileName.lastIndexOf("/"));
         fileName = fileName.substring(fileName.lastIndexOf("/")+1);
-		String command = authentificationUtils.finalHost + "/file/unzip/container/" + currentContainerId + "/application/"
+		String command = authentificationUtils.finalHost + "/file/unzip/container/" + currentContainer.getShortId() + "/application/"
 				+ applicationUtils.getCurrentApplication().getName() + "?path=" + currentPath + "&fileName=" + fileName;
 		Map<String, String> parameters = new HashMap<>();
 		parameters.put("applicationName", applicationUtils.getCurrentApplication().getName());
@@ -213,7 +195,7 @@ public class FileUtils {
 			Map<String, Object> params = new HashMap<>();
 			params.put("file", resource);
 			params.putAll(authentificationUtils.getMap());
-			restUtils.sendPostForUpload(authentificationUtils.finalHost + "/file/container/" + currentContainerId
+			restUtils.sendPostForUpload(authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId()
 					+ "/application/" + applicationUtils.getCurrentApplication().getName() + "?path=" + currentPath, params);
 		} catch (IOException e) {
 			log.log(Level.SEVERE, "File not found! Check the path file");
@@ -234,7 +216,7 @@ public class FileUtils {
 	    checkConnectedAndInFileExplorer();
         
         String json = restUtils.sendGetCommand(
-				authentificationUtils.finalHost + "/file/container/" + currentContainerId + "?path=" + currentPath,
+				authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId() + "?path=" + currentPath,
 				authentificationUtils.getMap()).get("body");
 
 		List<FileUnit> fileUnits = JsonConverter.getFileUnits(json);
@@ -256,25 +238,11 @@ public class FileUtils {
 
 		Map<String, Object> params = new HashMap<>();
 		params.putAll(authentificationUtils.getMap());
-		restUtils.sendGetFileCommand(authentificationUtils.finalHost + "/file/container/" + currentContainerId
+		restUtils.sendGetFileCommand(authentificationUtils.finalHost + "/file/container/" + currentContainer.getShortId()
 				+ "/application/" + applicationUtils.getCurrentApplication().getName() + "?path=" + currentPath + "/fileName/"
 				+ fileName, destFileName, params);
 		
 		return MessageFormat.format("File downloaded to {0}", destFileName);
-	}
-
-	private String getAvailableContainerNames() {
-		StringBuilder builder = new StringBuilder();
-		Server server = applicationUtils.getCurrentApplication().getServer();
-
-		builder.append("\t");
-		builder.append(server.getName());
-
-		for (Module module : applicationUtils.getCurrentApplication().getModules()) {
-		    builder.append("\t");
-			builder.append("\t" + module.getName());
-		}
-		return builder.toString();
 	}
 
 }

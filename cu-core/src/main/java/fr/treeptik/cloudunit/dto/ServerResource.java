@@ -23,6 +23,8 @@ public class ServerResource extends ResourceSupport {
     
     @Pattern(regexp = "^[^-]*(-(?!Xms)[^-]*)*$", groups = Patch.class)
     private String jvmOptions;
+    
+    private ImageResource image;
 
     public ServerResource() {}
     
@@ -30,6 +32,8 @@ public class ServerResource extends ResourceSupport {
         this.jvmMemory = server.getJvmMemory();
         this.jvmRelease = server.getJvmRelease();
         this.jvmOptions = server.getJvmOptions();
+        
+        this.image = new ImageResource(server.getImage());
     }
 
     public Long getJvmMemory() {
@@ -54,6 +58,14 @@ public class ServerResource extends ResourceSupport {
 
     public void setJvmOptions(String jvmOptions) {
         this.jvmOptions = jvmOptions;
+    }
+    
+    public ImageResource getImage() {
+        return image;
+    }
+    
+    public void setImage(ImageResource image) {
+        this.image = image;
     }
 
     public void patch(Server server) {
