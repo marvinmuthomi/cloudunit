@@ -140,7 +140,7 @@
         }
 
         function error(response) {
-          vm.message = response.data.message;
+          vm.message = response.message;
           vm.notValidated = true;
           vm.isPending = false;
         }

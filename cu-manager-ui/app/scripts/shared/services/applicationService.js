@@ -30,15 +30,22 @@ angular
 ApplicationService.$inject = [
 '$resource',
 '$http',
-'$interval'
+'$interval',
+'traverson',
+'$q'
 ];
 
 
-function ApplicationService ( $resource, $http, $interval ) {
+function ApplicationService ( $resource, $http, $interval, traverson, $q ) {
+
+
     var Application;
+    Application = $resource ( 'applications/:id', { id: '@name' } );
 
-    Application = $resource ( 'application/:id', { id: '@name' } );
-
+    var traversonService = traverson
+        .from('http://localhost:9000/applications')
+        .json()
+        .withRequestOptions({ headers: { 'Content-Type': 'application/json' } });
 
     return {
         about: about,
@@ -79,6 +86,7 @@ function assignObject(target) {
     return target;
 };
 
+// @TODO
 // A propos du manager
 function about () {
     return $http.get ( 'about' ).then ( function ( response ) {
@@ -86,69 +94,202 @@ function about () {
     } )
 }
 
+// @TODO remove mock
 // Liste des applications
 function list () {
-    return $http.get ( 'application' ).then ( function ( response ) {
-        return angular.copy ( response.data );
+
+    var res = 
+        [
+        {
+            "id":2,
+            "name":"plop",
+            "displayName":"plop",
+            "cuInstanceName":"DEV",
+            "origin":null,
+            "status":"START",
+            "date":"2016-11-07 15:03",
+            "user":{
+                "id":1,
+                "login":"johndoe",
+                "firstName":"John",
+                "lastName":"Doe",
+                "organization":"admin",
+                "signin":"2013-08-22 07:22",
+                "lastConnection":null,
+                "email":"johndoe.doe@gmail.com",
+                "status":1,
+                "role":{
+                "id":1,
+                "description":"ROLE_ADMIN"
+            }
+        },
+        "modules":[
+        ],
+        "server":{
+            "id":3,
+            "startDate":"2016-11-07 15:03",
+            "name":"dev-johndoe-plop-tomcat-7",
+            "containerID":"e8bbc8d0dc73",
+            "memorySize":null,
+            "containerIP":"172.17.0.8",
+            "status":"START",
+            "image":{
+            "id":11,
+            "name":"tomcat-7",
+            "path":"cloudunit/tomcat-7",
+            "displayName":"Tomcat 7.0.70",
+            "status":null,
+            "imageType":"server",
+            "managerName":"",
+            "prefixEnv":"tomcat",
+            "exposedPorts":null,
+            "prefixId":-868129468,
+            "imageSubType":null,
+            "moduleEnvironmentVariables":null
+        },
+        "internalDNSName":null,
+        "sshPort":null,
+        "jvmMemory":512,
+        "jvmOptions":"",
+        "jvmRelease":"jdk1.8.0_25",
+        "managerLocation":"http://manager-plop-johndoe-admin.cloudunit.dev/manager/html?",
+        "containerFullID":null
+        },
+        "deployments":[
+        ],
+        "aliases":[
+        ],
+        "suffixCloudUnitIO":".cloudunit.dev",
+        "domainName":".cloudunit.dev",
+        "managerIp":"192.168.50.4:4243",
+        "managerPort":null,
+        "jvmRelease":"jdk1.8.0_25",
+        "deploymentStatus":"NONE",
+        "contextPath":null,
+        "portsToOpen":[
+        ],
+        "location":"http://plop-johndoe-admin.cloudunit.dev",
+        "aclone":false
+        }
+    ];
+    return $http.get ( 'applications' ).then ( function ( response ) {
+        return angular.copy ( res );
     } )
 }
 
 // Creation d'une application
-function create ( applicationName, serverName ) {
-    var output = {};
-    output.applicationName = applicationName;
-    output.serverName = serverName;
+function create ( name, serverType ) {
+    var payload = {
+        name: name,
+        serverType: serverType
+    };
 
-    return Application.save ( JSON.stringify ( output ) ).$promise;
+    return toPromise(traversonService.post(  payload ).result);
 }
+
+function toPromise(promise) {
+    var q = $q.defer();
+
+    promise
+        .then(function (response) {
+            if(response.status === undefined || (response.status>= 200 && response.status < 300)) {
+                 if(response.body) {
+                     q.resolve(JSON.parse(response.body));
+                 } else {
+                     q.resolve('');
+                 }
+            } else {
+                 if(response.body) {
+                     q.reject(JSON.parse(response.body));
+                 } else {
+                     q.reject('');
+                 }
+            }
+        });
+
+    return q.promise;
+}
+
+// Creation d'une application
+// function create ( applicationName, serverName ) {
+//     var output = {};
+//     output.applicationName = applicationName;
+//     output.serverName = serverName;
+
+//     return Application.save ( JSON.stringify ( output ) ).$promise;
+// }
 
 // Démarrer une application
 function start ( applicationName ) {
-    var output = {};
-    output.applicationName = applicationName;
-    var Application = $resource ( 'application/start' );
-    return Application.save ( JSON.stringify ( output ) ).$promise;
+    return toPromise(traversonService
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "start")].href')
+        .post()
+        .result);
+
+    // var output = {};
+    // output.applicationName = applicationName;
+    // var Application = $resource ( 'applications/start' );
+    // return Application.save ( JSON.stringify ( output ) ).$promise;
 }
 
 // Démarrer une application
 function restart ( applicationName ) {
-    var output = {};
-    output.applicationName = applicationName;
-    var Application = $resource ( 'application/restart' );
-    return Application.save ( JSON.stringify ( output ) );
+
+   return toPromise(traversonService
+        .newRequest()
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "restart")].href')
+        .post()
+        .result);
 }
 
 // Arrêter une application
 function stop ( applicationName ) {
-    var output = {};
-    output.applicationName = applicationName;
-    var Application = $resource ( 'application/stop' );
-    return Application.save ( JSON.stringify ( output ) );
+
+   return toPromise(traversonService
+        .newRequest()
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "stop")].href')
+        .post()
+        .result);
 }
 
+// @TODO
 // Teste la validite d'une application avant qu'on puisse la creer
 function isValid ( applicationName, serverName ) {
-    var validity = $resource ( 'application/verify/' + applicationName + '/' + serverName );
+    var validity = $resource ( 'applications/verify/' + applicationName + '/' + serverName );
     return validity.get ().$promise;
 }
 
 // Suppression d'une application
 function remove ( applicationName ) {
-    Application.get ( { id: applicationName }, function ( ref ) {
-        ref.$delete ();
-    } );
+    console.log('remove');
+       traversonService
+        .newRequest()
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "self")].href')
+        .delete();
 }
 
+// @TODO return image property
 // Récupération d'une application selon son nom
 function findByName ( applicationName ) {
     var self = this;
-    return $http.get ( 'application/' + applicationName ).then ( function ( response ) {
-        return assignObject(self.state, response.data);
-    } ).catch ( function () {
-        stopPolling.call ( self );
-    } )
-}
 
+   return toPromise(traversonService
+        .newRequest()
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "self")].href')
+        .get()
+        .result)
+            .then ( function ( response ) {
+                return assignObject(self.state, response);
+            } ).catch ( function () {
+                stopPolling.call ( self );
+            } );
+    // return $http.get ( 'applications/' + applicationName ).then ( function ( response ) {
+    //     return assignObject(self.state, response.data);
+    // } ).catch ( function () {
+    //     stopPolling.call ( self );
+    // } )
+}
+// @TODO
 function init ( applicationName ) {
     var self = this;
     if ( !self.timer ) {
@@ -158,7 +299,7 @@ function init ( applicationName ) {
         self.state = response;
     } );
 }
-
+// @TODO
 function pollApp ( applicationName ) {
     var self = this;
     return $interval ( function () {
@@ -167,7 +308,7 @@ function pollApp ( applicationName ) {
         } );
     }, 2000 )
 }
-
+// @TODO
 function stopPolling () {
     if ( this.timer ) {
         $interval.cancel ( this.timer );
@@ -175,6 +316,7 @@ function stopPolling () {
     }
 }
 
+// @TODO
 // Liste de toutes les container d'une application en fonction du type server/module
 function listContainers ( applicationName ) {
     var container = $resource ( 'application/:applicationName/containers' );
@@ -182,22 +324,27 @@ function listContainers ( applicationName ) {
 }
 
 // Gestion des alias
-
+// @TODO
 function createAlias ( applicationName, alias ) {
-    var data = {
-        applicationName: applicationName,
+    
+    var payload = {
         alias: alias
     };
-    return $http.post ( 'application/alias', data );
-}
 
+    return toPromise(traversonService
+        .newRequest()
+        .follow('$.content[?(@.name == "' + applicationName + '")].links[?(@.rel == "aliases")].href')
+        .post(  payload )
+        .result);
+}
+// @TODO
 function removeAlias ( applicationName, alias ) {
     return $http.delete ( 'application/' + applicationName + '/alias/' + alias );
 }
 
 
 // Gestion des ports
-
+// @TODO
 function createPort ( applicationName, number, nature, isQuickAccess ) {
     var data = {
         applicationName: applicationName,
@@ -207,11 +354,11 @@ function createPort ( applicationName, number, nature, isQuickAccess ) {
     };
     return $http.post ( 'application/ports', data );
 }
-
+// @TODO
 function removePort ( applicationName, number ) {
     return $http.delete ( 'application/' + applicationName + '/ports/' + number );
 }
-
+// @TODO
  function openPort(moduleID, statePort, portInContainer) {
     var data = {
         publishPort: statePort
