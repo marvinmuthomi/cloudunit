@@ -34,7 +34,7 @@
           <div class="rect5"></div>
         </div>
         <span class="icon-whhg pageback image"></span>
-        <span class="text"> Select other module</span>
+        <span class="text">Select other module</span>
       </button>
     </div>
 
@@ -53,7 +53,7 @@
           <div class="rect5"></div>
         </div>
         <span class="image icon-tech icon-tech-default {{ image.name | truncatestringfilter | lowercase }}"></span>
-        <span class="text">{{ image.displayName }}zdz</span>
+        <span class="text">{{ image.displayName }}</span>
       </button>
     </div>
   </div>
@@ -61,13 +61,12 @@
 <div class="content clearfix" ng-if="!modules.typeImage">
     <h3 class="title large">Add a module</h3>
     
-    <div class="tile tile-sm module animate-module" data-ng-class="{disabled: image == 'mongo' || image == 'redis'}" ng-animate="{enter: 'animate-enter', leave: 'animate-leave'}" ng-init="modules.checkIconModule(modules.categorieImage)"
+    <div class="tile tile-sm module animate-module"  ng-animate="{enter: 'animate-enter', leave: 'animate-leave'}" ng-init="modules.checkIconModule(modules.categorieImage)"
     data-ng-repeat="image in modules.categorieImage | orderBy:'toString()' | filter:modules.typeImage:strict" style="animation-delay: {{ $index * 0.3 }}s" >
       <button
         class="tile-content"
         ripple=""
         click-once=""
-        data-ng-disabled="image == 'mongo' || image == 'redis'"
         ui-sref="editApplication.addModule({ typeImage: image })" >
           <div class="spinner">
             <div class="rect1"></div>

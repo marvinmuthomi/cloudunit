@@ -54,22 +54,11 @@ function ApplicationService ( $resource, $http, $interval ) {
         removeAlias: removeAlias,
         createPort: createPort,
         removePort: removePort,
+        openPort: openPort,
         restart: restart,
         init: init,
         state: {},
-        stopPolling: stopPolling,
-        getVariableEnvironment: getVariableEnvironment,
-        getListSettingsEnvironmentVariable: getListSettingsEnvironmentVariable,
-        getSettingsEnvironmentVariable: getSettingsEnvironmentVariable,
-        addEnvironmentVariable: addEnvironmentVariable,
-        editEnvironmentVariable: editEnvironmentVariable,
-        deleteEnvironmentVariable: deleteEnvironmentVariable,
-        getListSettingsVolume: getListSettingsVolume,
-        getSettingsVolume: getSettingsVolume,
-        addVolume: addVolume,
-        editVolume: editVolume,
-        deleteVolume: deleteVolume
-
+        stopPolling: stopPolling
     };
 
 
@@ -209,11 +198,12 @@ function removeAlias ( applicationName, alias ) {
 
 // Gestion des ports
 
-function createPort ( applicationName, number, nature ) {
+function createPort ( applicationName, number, nature, isQuickAccess ) {
     var data = {
         applicationName: applicationName,
         portToOpen: number,
-        portNature: nature
+        portNature: nature,
+        portQuickAccess: isQuickAccess
     };
     return $http.post ( 'application/ports', data );
 }
@@ -222,49 +212,15 @@ function removePort ( applicationName, number ) {
     return $http.delete ( 'application/' + applicationName + '/ports/' + number );
 }
 
-// Gestion des variables environnement
-
-function getListSettingsEnvironmentVariable ( applicationName, containerName ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/environmentVariables' );
-    return dir.query ( {
-        applicationName: applicationName,
-        containerName: containerName
-    } ).$promise;      
-}
-
-function getSettingsEnvironmentVariable ( applicationName, containerName, environmentVariableID ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/environmentVariables/:id' );
-    return dir.get ( {
-        applicationName: applicationName,
-        containerName: containerName,
-        id: environmentVariableID
-    } ).$promise;
-}
-
-function addEnvironmentVariable ( applicationName, containerName, environmentVariableKey, environmentVariableValue ) {
+ function openPort(moduleID, statePort, portInContainer) {
     var data = {
-        keyEnv: environmentVariableKey,
-        valueEnv: environmentVariableValue
+        publishPort: statePort
     };
 
-    var dir = $resource ( 'application/:applicationName/container/:containerName/environmentVariables' );
-    return dir.save ( {
-        applicationName: applicationName,
-        containerName: containerName
-    }, data ).$promise;
-}
-
-function editEnvironmentVariable ( applicationName, containerName, environmentVariableID, environmentVariableKey, environmentVariableValue ) {
-    var data = {
-        keyEnv: environmentVariableKey,
-        valueEnv: environmentVariableValue
-    };
-
-    var dir = $resource ( 'application/:applicationName/container/:containerName/environmentVariables/:id' ,
+    var dir = $resource ( '/module/:moduleID/ports/:portInContainer' ,
     { 
-        applicationName: applicationName,
-        containerName: containerName,
-        id: environmentVariableID
+        moduleID: moduleID,
+        portInContainer: portInContainer
     },
     { 
         'update': { 
@@ -277,99 +233,7 @@ function editEnvironmentVariable ( applicationName, containerName, environmentVa
         }
     }
     );
-    return dir.update( { }, data ).$promise; 
-}
-
-function deleteEnvironmentVariable ( applicationName, containerName, environmentVariableID ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/environmentVariables/:id' );
-    return dir.delete ( { 
-        applicationName: applicationName,
-        containerName: containerName,
-        id: environmentVariableID
-    }, {} ).$promise; 
-}
-
-function getVariableEnvironment ( applicationName, containerName ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/env' );
-    return dir.query ( {
-        applicationName: applicationName,
-        containerName: containerName
-    } ).$promise;      
-}
-
-// Gestion des volumes
-
-function getListSettingsVolume(applicationName, containerName) {
-    var dir = $resource('server/volume/containerName/:containerName');
-    return dir.query({
-        containerName: containerName
-    }).$promise;      
-}
-
-//function getListSettingsVolume ( applicationName, containerName ) {
-//   var dir = $resource ( 'application/:applicationName/container/:containerName/volumes' );
-//   return dir.query ( {
-//     applicationName: applicationName,
-//     containerName: containerName
-//   } ).$promise;      
-// }
-
-function getSettingsVolume ( applicationName, containerName, volumeID ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/volumes/:id' );
-    return dir.get ( {
-        applicationName: applicationName,
-        containerName: containerName,
-        id: volumeID
-    } ).$promise;
-}
-
-function addVolume ( applicationName, containerName, volumeName, volumePath ) {
-    console.log(containerName);
-    var data = {
-        name: volumeName,
-        path: volumePath
-    };
-
-    var dir = $resource ( 'application/:applicationName/container/:containerName/volumes' );
-    return dir.save ( {
-        applicationName: applicationName,
-        containerName: containerName
-    }, data ).$promise;
-}
-
-function editVolume ( applicationName, containerName, volumeID, volumeName, volumePath ) {
-    var data = {
-        name: volumeName,
-        path: volumePath
-    };
-
-    var dir = $resource ( 'application/:applicationName/container/:containerName/volumes/:id' ,
-    { 
-        applicationName: applicationName,
-        containerName: containerName,
-        id: volumeID
-    },
-    { 
-        'update': { 
-            method: 'PUT',
-            transformResponse: function ( data, headers ) {
-                var response = {};
-                response = JSON.parse(data);
-                return response;
-            }
-        }
-    }
-    );
-    return dir.update( { }, data ).$promise; 
-}
-
-function deleteVolume ( applicationName, containerName, volumeID ) {
-    var dir = $resource ( 'application/:applicationName/container/:containerName/volumes/:id' );
-    return dir.delete ( { 
-        applicationName: applicationName,
-        containerName: containerName,
-        id: volumeID
-    }, {} ).$promise; 
+    return dir.update( { }, data ).$promise;
 }
 
 }

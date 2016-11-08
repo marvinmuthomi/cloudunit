@@ -75,6 +75,7 @@ RUN set -x \
 COPY httpd-foreground /usr/local/bin/
 
 ## CLOUDUNIT :: BEGINNING
+ENV CU_SERVER_RESTART_POST_DEPLOYMENT false
 ENV CU_SOFTWARE ""
 ENV CU_SERVER_MANAGER_PATH ""
 ENV CU_SERVER_MANAGER_PORT 80
@@ -95,4 +96,6 @@ RUN chmod +x /opt/cloudunit/scripts/*
 EXPOSE 80
 CMD ["httpd-foreground"]
 
-
+LABEL origin application
+LABEL application-type apache
+LABEL application-version 2-2

@@ -7,6 +7,7 @@ ARG WILDFLY_SHA1
 ENV JBOSS_HOME /opt/cloudunit/wildfly
 
 ## CLOUDUNIT :: BEGINNING
+ENV CU_SERVER_RESTART_POST_DEPLOYMENT false
 ENV CU_SOFTWARE $JBOSS_HOME
 ENV CU_SERVER_MANAGER_PATH " "
 ENV CU_SERVER_MANAGER_PORT 9990
@@ -16,7 +17,7 @@ ENV CU_DEFAULT_LOG_FILE server.log
 ENV CU_LOGS $JBOSS_HOME/standalone/log
 ENV CU_DEFAULT_JAVA_RELEASE "jdk1.7.0_55"
 ENV JAVA_HOME /opt/cloudunit/java/$CU_DEFAULT_JAVA_RELEASE
-ENV JAVA_OPTS "-Xms512m -Xmx512m -XX:MaxPermSize=256m -Djava.net.preferIPv4Stack=true -Djboss.modules.system.pkgs=$JBOSS_MODULES_SYSTEM_PKGS -Djava.awt.headless=true"
+ENV JAVA_OPTS "-Xms512m -Xmx512m -XX:MaxPermSize=256m -Djava.net.preferIPv4Stack=true -Djboss.modules.system.pkgs=$JBOSS_MODULES_SYSTEM_PKGS -Djava.awt.headless=true "
 ## CLOUDUNIT :: END
 
 # Add the WildFly distribution to /opt/cloudunit/wildfly, and make wildfly the owner of the extracted tar content
@@ -43,3 +44,6 @@ VOLUME /opt/cloudunit/
 
 CMD ["/opt/cloudunit/wildfly/bin/standalone.sh", "-b", "0.0.0.0", "-bmanagement", "0.0.0.0"]
 
+LABEL origin application
+LABEL application-type wildfy
+LABEL application-version $WILDFLY_VERSION

@@ -18,9 +18,9 @@
 
   /**
    * @ngdoc function
-   * @name webuiApp.controller:TimelineCtrl
+   * @name webuiApp.controller:EditVolumeCtrl
    * @description
-   * # TimelineCtrl
+   * # EditVolumeCtrl
    * Controller of the webuiApp
    */
   angular
@@ -36,67 +36,75 @@
       },
       controller: [
         'FeedService',
+        'ApplicationService',
+        'VolumeService',
         'ErrorService',
         '$resource',
-        '$http',
         EditVolumeCtrl
       ],
       controllerAs: 'editVolume',
     };
   }
 
-  function EditVolumeCtrl (FeedService, ErrorService, $resource, $http) {
+  function EditVolumeCtrl (FeedService, ApplicationService, VolumeService, ErrorService, $resource) {
 
-    var editVolume = this;
+    var vm = this;
+    vm.errorVolumeCreate = "";
+    vm.errorVolumeDelete = "";
 
-    editVolume.errorVolumeCreate = "";
+    vm.addVolume = addVolume;
+    vm.deleteVolume = deleteVolume;
 
-    editVolume.$onInit = function() {
+    vm.$onInit = function() {
       getListVolumes();
-    }
-
-    editVolume.addVolume = function() {
-        if(!editVolume.newVolumeName) {
-            return 0;
-        }
-
-        $http({
-            method: 'POST',
-            url: '/volume',
-            data: {
-                name: editVolume.newVolumeName
-            }
-        }).then(function successCallback(response) {
-            editVolume.newVolumeName = "";
-            editVolume.errorVolumeCreate = '';
-            getListVolumes();
-        }, function errorCallback(response) {
-            editVolume.errorVolumeCreate = response.data.message;
-            console.log(response);
-        });  
-    }
-
-    editVolume.deleteVolume = function(id) {
-       $http({
-            method: 'DELETE',
-            url: '/volume/'+id
-        }).then(function successCallback(response) {
-            getListVolumes();
-        }, function errorCallback(response) {
-               
-        }); 
     }
 
     ////////////////////////////////////////////////////
 
-    function getListVolumes() {
-        var dir = $resource('volume');
+    function addVolume ( volumeName ) {
+      VolumeService.addVolume ( volumeName )
+        .then ( function(response) {
+          vm.newVolumeName = "";
+          vm.errorVolumeCreate = '';
+          vm.errorVolumeDelete = "";
+          getListVolumes();
+        })
+        .catch(function(response) {
+          vm.errorVolumeDelete = "";
+          vm.errorVolumeCreate = response.data.message;
+          getListVolumes();
+        });  
+    }
 
-        var volumesList = dir.query().$promise;
-        volumesList.then(function(response) {
-            editVolume.volumes = response;
-        });
+    function deleteVolume (id) {
+      VolumeService.deleteVolume ( id )
+        .then ( function(response) {
+          getListVolumes();
+        })
+        .catch(function(response) {
+          vm.errorVolumeCreate = "";
+          vm.errorVolumeDelete = response.data.message;
+          getListVolumes();
+        }); 
+    }
+
+    function getListVolumes() {
+      VolumeService.getListVolume ( )
+        .then(function(response) {
+          vm.volumes = response;
+          angular.forEach(vm.volumes, function(volume, volumeIndex) {
+            
+            VolumeService.getLinkVolumeAssociation ( volume.id )
+              .then(function(response) {
+                vm.volumes[volumeIndex].applications = [];
+                angular.forEach(response, function(application, applicationIndex) { 
+                  ApplicationService.findByName( application.application ).then(function(response) {
+                      vm.volumes[volumeIndex].applications.push(response);
+                  });
+                });
+            });
+          });
+      });      
     }
   }
 }) ();
-

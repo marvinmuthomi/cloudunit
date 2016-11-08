@@ -44,16 +44,15 @@ You can test the common platform online here (reseted all night)
 ## Getting started
 
 There are many installation guides
-* [Server installation guide](documentation/SERVER-GUIDE.md) (TO BE UPDATED)
+* [Server installation guide](documentation/SERVER-GUIDE.md)
 * [Development guide Linux](documentation/DEV-GUIDE-LINUX.md)
 * [Development guide MacOSX](documentation/DEV-GUIDE-MACOSX.md)
 * [Add new module](documentation/MODULE-GUIDE.md)
 
 ## Go further
     
-* [CloudUnit CLI guide](https://github.com/Treeptik/cloudunit/blob/migration-112/documentation/CLI-GUIDE.md)
-* [CloudUnit Maven Plugin](https://github.com/Treeptik/cloudunit-maven-plugin/blob/master/README.md)
-* [CloudUnit with Jenkins2/GitLab](documentation/CI-CD.md) [SOON UPDATED]
+* [CloudUnit CLI guide](https://github.com/Treeptik/cloudunit/blob/dev/documentation/CLI-GUIDE.md)
+* [CloudUnit Maven Plugin](https://github.com/Treeptik/cloudunit/tree/dev/cu-maven/README.md)
 
 ## Examples
 

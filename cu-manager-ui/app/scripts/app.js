@@ -46,6 +46,7 @@
       'ui.codemirror',
       'ngclipboard',
       'xeditable',
+      'ng-sweet-alert',
       'uiSwitch',
 
       //shared modules
@@ -57,6 +58,7 @@
       'webuiApp.dashboard',
       'webuiApp.editApplication',
       'webuiApp.editVolume',
+      'webuiApp.monitoring',
       'webuiApp.snapshots',
       'webuiApp.mainTimeline',
       'webuiApp.scripting',

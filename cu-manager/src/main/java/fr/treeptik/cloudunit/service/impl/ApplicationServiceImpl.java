@@ -25,8 +25,6 @@ import java.util.Map;
 import javax.inject.Inject;
 import javax.persistence.PersistenceException;
 
-import fr.treeptik.cloudunit.model.*;
-import fr.treeptik.cloudunit.utils.NamingUtils;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Value;
@@ -46,6 +44,15 @@ import fr.treeptik.cloudunit.enums.RemoteExecAction;
 import fr.treeptik.cloudunit.exception.CheckException;
 import fr.treeptik.cloudunit.exception.FatalDockerJSONException;
 import fr.treeptik.cloudunit.exception.ServiceException;
+import fr.treeptik.cloudunit.model.Application;
+import fr.treeptik.cloudunit.model.Deployment;
+import fr.treeptik.cloudunit.model.DeploymentType;
+import fr.treeptik.cloudunit.model.Image;
+import fr.treeptik.cloudunit.model.Module;
+import fr.treeptik.cloudunit.model.PortToOpen;
+import fr.treeptik.cloudunit.model.Server;
+import fr.treeptik.cloudunit.model.Status;
+import fr.treeptik.cloudunit.model.User;
 import fr.treeptik.cloudunit.service.ApplicationService;
 import fr.treeptik.cloudunit.service.DeploymentService;
 import fr.treeptik.cloudunit.service.DockerService;
@@ -56,6 +63,7 @@ import fr.treeptik.cloudunit.service.ServerService;
 import fr.treeptik.cloudunit.utils.AuthentificationUtils;
 import fr.treeptik.cloudunit.utils.DomainUtils;
 import fr.treeptik.cloudunit.utils.HipacheRedisUtils;
+import fr.treeptik.cloudunit.utils.NamingUtils;
 
 @Service
 public class ApplicationServiceImpl implements ApplicationService {
@@ -100,7 +108,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 	@Inject
 	private MessageSource messageSource;
 
-	@Value("${docker.manager.ip:192.168.50.4:2376}")
+	@Value("${docker.manager.ip:192.168.50.4:4243}")
 	private String dockerManagerIp;
 
 	@Value("${suffix.cloudunit.io}")
@@ -333,7 +341,11 @@ public class ApplicationServiceImpl implements ApplicationService {
 				removeAlias(application, alias);
 			}
 
-			Server server = application.getServer();
+			// Remove all ports (web and others...) only for redis
+            // Remove database references are associated to CASCADE.REMOVE
+            removePortsForRedis(application);
+
+            Server server = application.getServer();
 			serverService.remove(server.getName());
 
 			application.removeServer();
@@ -497,15 +509,21 @@ public class ApplicationServiceImpl implements ApplicationService {
 			};
 			String result = dockerService.execCommand(containerId, RemoteExecAction.DEPLOY.getCommand(kvStore));
 			logger.info ("Deploy command {}", result);
-			deploymentService.create(application, DeploymentType.from(filename), contextPath);
-			
-			@SuppressWarnings("serial")
-            HashMap<String, String> kvStore2 = new HashMap<String, String>() {
-			    {
-			        put("CU_TARGET", Paths.get(tempDirectory, filename).toString());
-			    }
-			};
-            dockerService.execCommand(containerId, RemoteExecAction.CLEAN_DEPLOY.getCommand(kvStore2));
+			Deployment deployment = deploymentService.create(application, DeploymentType.from(filename), contextPath);
+			application.addDeployment(deployment);
+			application.setDeploymentStatus(Application.ALREADY_DEPLOYED);
+
+			// If application is anything else than .jar or ROOT.war
+			// we need to clean for the next deployment.
+			if (!"/".equalsIgnoreCase(contextPath)) {
+				@SuppressWarnings("serial")
+				HashMap<String, String> kvStore2 = new HashMap<String, String>() {
+					{
+						put("CU_TARGET", Paths.get(tempDirectory, filename).toString());
+					}
+				};
+				dockerService.execCommand(containerId, RemoteExecAction.CLEAN_DEPLOY.getCommand(kvStore2));
+			}
 		} catch (Exception e) {
 			throw new ServiceException(e.getLocalizedMessage(), e);
 		}
@@ -625,21 +643,22 @@ public class ApplicationServiceImpl implements ApplicationService {
 
 	@Transactional
 	@Override
-	public PortToOpen addPort(Application application, String nature, Integer port) throws ServiceException {
+	public PortToOpen addPort(Application application, String nature, Integer port, Boolean isQuickAccess) throws ServiceException {
 		PortToOpen portToOpen = new PortToOpen();
 		portToOpen.setNature(nature);
+		portToOpen.setQuickAccess(isQuickAccess);
 		portToOpen.setPort(port);
 		portToOpen.setApplication(application);
 		try {
 			String alias = null;
 			// add the port alias for http mode only
 			if ("web".equalsIgnoreCase(portToOpen.getNature())) {
-				hipacheRedisUtils.writeNewAlias(
-						(application.getName() + "-" + application.getUser().getLogin() + "-" + "forward-"
-								+ portToOpen.getPort() + application.getSuffixCloudUnitIO()),
-						application, portToOpen.getPort().toString());
-				alias = "http://" + application.getName() + "-" + application.getUser().getLogin() + "-" + "forward-"
-						+ portToOpen.getPort() + application.getDomainName();
+
+                alias = NamingUtils.getAliasForOpenPortFeature(application.getName(), application.getUser().getLogin(),
+                        port, application.getDomainName());
+
+                hipacheRedisUtils.writeNewAlias(alias, application, port.toString());
+
 			} else if ("other".equalsIgnoreCase(portToOpen.getNature())) {
 				alias = application.getServer().getName() + "."
 						+ application.getServer().getImage().getPath().substring(10) + ".cloud.unit";
@@ -655,7 +674,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 	public void updatePortAlias(PortToOpen portToOpen, Application application) {
 		if ("web".equalsIgnoreCase(portToOpen.getNature())) {
 			hipacheRedisUtils.updatePortAlias(application.getServer().getContainerIP(), portToOpen.getPort(),
-					portToOpen.getAlias().substring(portToOpen.getAlias().lastIndexOf("//") + 2));
+					portToOpen.getAlias());
 		}
 	}
 
@@ -668,7 +687,7 @@ public class ApplicationServiceImpl implements ApplicationService {
 
 		try {
 			if ("web".equalsIgnoreCase(portToOpen.getNature())) {
-				hipacheRedisUtils.removeServerPortAlias(portToOpen.getAlias().substring(7));
+				hipacheRedisUtils.removeServerPortAlias(portToOpen.getAlias());
 			}
 			portToOpenDAO.delete(portToOpen);
 			saveInDB(application);
@@ -677,6 +696,23 @@ public class ApplicationServiceImpl implements ApplicationService {
 		}
 
 	}
+
+    /**
+     * Remove all ports.
+     *
+     * @param application
+     */
+    private void removePortsForRedis(Application application) {
+        application.getPortsToOpen().stream().forEach(
+                p -> {
+                    try {
+                        hipacheRedisUtils.removeServerPortAlias(p.getAlias());
+                    } catch (Exception e) {
+                        logger.error(p.toString(), e);
+                    }
+                }
+        );
+    }
 
 	private boolean checkAliasIfExists(String alias) {
 		if (applicationDAO.findAliasesForAllApps().contains(alias)) {

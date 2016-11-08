@@ -1,6 +1,7 @@
 package fr.treeptik.cloudunit.service.impl;
 
 import java.util.List;
+import java.util.Set;
 
 import javax.inject.Inject;
 
@@ -34,16 +35,24 @@ public class VolumeServiceImpl implements VolumeService {
 		try {
 			checkVolumeFormat(name);
 			dockerCloudUnitClient.createVolume(name, "runtime");
-			Volume volume = new Volume();
-			volume.setName(name);
+			return registerNewVolume(name);
+		} catch (CheckException e) {
+			throw new CheckException(e.getMessage());
+		}
+	}
+
+	@Override
+	@Transactional
+	public Volume registerNewVolume(String name) {
+		try {
+			Volume volume = new Volume(name);
 			volume = volumeDAO.save(volume);
 			return volume;
 		} catch (CheckException e) {
 			throw new CheckException(e.getMessage());
 		}
-
 	}
-
+	
 	@Override
 	@Transactional
 	public Volume updateVolume(Volume volume) {
@@ -64,6 +73,9 @@ public class VolumeServiceImpl implements VolumeService {
 	public void delete(int id) {
 		try {
 			Volume volume = loadVolume(id);
+			if(volume.getVolumeAssociations().size() != 0) {
+				throw new CheckException("Volume couldn't be remove because it's currently linked whith application");
+			}
 			volumeDAO.delete(id);
 			dockerCloudUnitClient.removeVolume(volume.getName());
 		} catch (CheckException e) {
@@ -72,6 +84,7 @@ public class VolumeServiceImpl implements VolumeService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public Volume loadVolume(int id) throws CheckException {
 		Volume volume = volumeDAO.findById(id);
 		if (volume == null)
@@ -80,6 +93,7 @@ public class VolumeServiceImpl implements VolumeService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Volume> loadAllVolumes() {
 		return volumeDAO.findAllVolumes();
 	}
@@ -95,6 +109,7 @@ public class VolumeServiceImpl implements VolumeService {
 	}
 
 	@Override
+	@Transactional(readOnly = true)
 	public List<Volume> loadAllByContainerName(String containerName) throws ServiceException {
 		return volumeDAO.findVolumesByContainerName(containerName);
 	}
@@ -105,13 +120,21 @@ public class VolumeServiceImpl implements VolumeService {
 	}
 
 	@Override
+	@Transactional
 	public VolumeAssociation saveAssociation(VolumeAssociation volumeAssociation) {
 		return volumeAssociationDAO.save(volumeAssociation);
 	}
 
 	@Override
+	@Transactional
 	public void removeAssociation(VolumeAssociation volumeAssociation) {
 		volumeAssociationDAO.delete(volumeAssociation);
+	}
+
+	@Override
+	@Transactional
+	public Set<VolumeAssociation> loadVolumeAssociations(int id) {
+		return loadVolume(id).getVolumeAssociations();
 	}
 
 }

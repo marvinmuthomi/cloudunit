@@ -7,6 +7,7 @@ ARG WILDFLY_SHA1
 ENV JBOSS_HOME /opt/cloudunit/wildfly
 
 ## CLOUDUNIT :: BEGINNING
+ENV CU_SERVER_RESTART_POST_DEPLOYMENT false
 ENV CU_SOFTWARE $JBOSS_HOME
 ENV CU_SERVER_MANAGER_PATH " "
 ENV CU_SERVER_MANAGER_PORT 9990
@@ -43,3 +44,6 @@ VOLUME /opt/cloudunit/
 
 CMD ["/opt/cloudunit/wildfly/bin/standalone.sh", "-b", "0.0.0.0", "-bmanagement", "0.0.0.0"]
 
+LABEL origin application
+LABEL application-type wildfy
+LABEL application-version $WILDFLY_VERSION
